@@ -65,6 +65,11 @@ test_vcd:
 	mkdir -p generated
 	$(SBT) "testOnly -- -DwriteVcd=1" | tee generated/test.rpt
 
+test_fst:
+	@echo Running tests with FST
+	mkdir -p generated
+	$(SBT) "testOnly -- -DwriteFst=1" | tee generated/test.rpt
+
 # Run the tests with Scala code coverage enables
 cov:
 	@echo Running tests with coverage enabled
