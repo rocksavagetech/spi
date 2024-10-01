@@ -12,6 +12,11 @@
 
 \maketitle
 
+\section{Features Brainstorming (To be removed before distribution)}
+\begin{itemize}
+    \item Daisy Chaining
+\end{itemize}
+
 \section{Introduction}
 The Serial Peripheral Interface (SPI) is a synchronous, full-duplex communication protocol widely used to interface microcontrollers with peripheral devices such as sensors, ADCs, DACs, and memory devices. This document summarizes the operational behavior of the SPI protocol, including data transmission mechanisms, clock configurations, and multi-subnode communication methods.
 
@@ -43,36 +48,36 @@ Based on the combinations of CPOL and CPHA, four SPI modes can be established, a
     \label{tab:spi_modes}
 \end{table}
 
-\section{Timing Diagrams}
-Figures \ref{fig:mode0}, \ref{fig:mode1}, \ref{fig:mode2}, and \ref{fig:mode3} illustrate the timing diagrams for SPI modes 0, 1, 2, and 3, respectively, showing how data is sampled and shifted according to the selected clock configuration.
+% \section{Timing Diagrams}
+% Figures \ref{fig:mode0}, \ref{fig:mode1}, \ref{fig:mode2}, and \ref{fig:mode3} illustrate the timing diagrams for SPI modes 0, 1, 2, and 3, respectively, showing how data is sampled and shifted according to the selected clock configuration.
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{mode0.png}
-    \caption{SPI Mode 0: Data sampled on rising edge, shifted on falling edge.}
-    \label{fig:mode0}
-\end{figure}
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{mode0.png}
+%     \caption{SPI Mode 0: Data sampled on rising edge, shifted on falling edge.}
+%     \label{fig:mode0}
+% \end{figure}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{mode1.png}
-    \caption{SPI Mode 1: Data sampled on falling edge, shifted on rising edge.}
-    \label{fig:mode1}
-\end{figure}
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{mode1.png}
+%     \caption{SPI Mode 1: Data sampled on falling edge, shifted on rising edge.}
+%     \label{fig:mode1}
+% \end{figure}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{mode2.png}
-    \caption{SPI Mode 2: Data sampled on rising edge, shifted on falling edge.}
-    \label{fig:mode2}
-\end{figure}
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{mode2.png}
+%     \caption{SPI Mode 2: Data sampled on rising edge, shifted on falling edge.}
+%     \label{fig:mode2}
+% \end{figure}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{mode3.png}
-    \caption{SPI Mode 3: Data sampled on falling edge, shifted on rising edge.}
-    \label{fig:mode3}
-\end{figure}
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{mode3.png}
+%     \caption{SPI Mode 3: Data sampled on falling edge, shifted on rising edge.}
+%     \label{fig:mode3}
+% \end{figure}
 
 \section{Multi-Subnode Configuration}
 SPI supports configurations with multiple subnodes connected to a single main device. This can be achieved in two ways: regular mode and daisy-chain mode.
