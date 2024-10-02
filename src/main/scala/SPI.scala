@@ -48,26 +48,28 @@ class SPI(val width: Int = 8) extends Module {
       }
 
       is(sTransmit) {
-        // Clock toggling based on CPOL and CPHA
         when(counter < width.U) {
           clockReg := !clockReg // Toggle clock
 
           // Handle data shifting based on CPOL and CPHA
           when(!io.cpha) {
             // CPHA = 0: Sample on the leading clock edge (CPOL flip)
-            when(clockReg =/= io.cpol) { // Leading edge (away from CPOL)
-              shiftReg := Cat(shiftReg(width - 2, 0), io.miso) // Shift in MISO
+            when(clockReg === !io.cpol) { // Leading edge (away from CPOL)
+              // Shift in the MISO bit only when it's time to sample
+              shiftReg := Cat(shiftReg(width - 2, 0), io.miso)
               counter := counter + 1.U
             }
           } .otherwise {
             // CPHA = 1: Sample on the trailing clock edge (CPOL match)
             when(clockReg === io.cpol) { // Trailing edge (matching CPOL)
-              shiftReg := Cat(shiftReg(width - 2, 0), io.miso) // Shift in MISO
+              // Shift in the MISO bit only when it's time to sample
+              shiftReg := Cat(shiftReg(width - 2, 0), io.miso)
               counter := counter + 1.U
             }
           }
         } .otherwise {
-          io.dataOut := shiftReg // Output the received data
+          // Output the final received data when transmission is done
+          io.dataOut := shiftReg
           state := sDone
         }
       }

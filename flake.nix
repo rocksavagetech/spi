@@ -144,6 +144,7 @@
 
                     firefox
                     gcc
+                    git
                 ];
                 shellHook = ''
                     export CHISEL_FIRTOOL_PATH="${pkgs.circt}/bin"
