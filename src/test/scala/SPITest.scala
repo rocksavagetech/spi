@@ -5,6 +5,7 @@ import org.scalatest.matchers.should.Matchers
 import chisel3._
 import chisel3.util._
 import chiseltest._
+import chiseltest.simulator.VerilatorCFlags
 class SPITest extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   
   // Utility function to simulate SPI clock and data shifts
@@ -35,11 +36,25 @@ class SPITest extends AnyFlatSpec with ChiselScalatestTester with Matchers {
           dut.clock.step(1) // Falling edge, change data
         }
       }
+      // expect data to be shifted in
+      val actual = dut.io.dataOut.peek()(7).litValue
+      val expected = data(7-i).litValue
+
+      println(s"actual: ${actual}")
+      println(s"expected: ${expected}")
+
+      require(actual == expected)
     }
   }
 
+  val annotations = Seq(
+    VerilatorBackendAnnotation,
+    VerilatorCFlags(Seq("--std=c++17")),
+    WriteFstAnnotation
+  )
+
   "SPI" should "correctly transmit and receive data with CPOL = 0 and CPHA = 0" in {
-    test(new SPI(8)) { dut =>
+    test(new SPI(8)).withAnnotations(annotations) { dut =>
       dut.io.cs.poke(false.B)
       dut.io.cpol.poke(false.B) // CPOL = 0
       dut.io.cpha.poke(false.B) // CPHA = 0
@@ -60,7 +75,7 @@ class SPITest extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "correctly transmit and receive data with CPOL = 0 and CPHA = 1" in {
-    test(new SPI(8)) { dut =>
+    test(new SPI(8)).withAnnotations(annotations) { dut =>
       dut.io.cs.poke(false.B)
       dut.io.cpol.poke(false.B) // CPOL = 0
       dut.io.cpha.poke(true.B)  // CPHA = 1
@@ -81,7 +96,7 @@ class SPITest extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "correctly transmit and receive data with CPOL = 1 and CPHA = 0" in {
-    test(new SPI(8)) { dut =>
+    test(new SPI(8)).withAnnotations(annotations) { dut =>
       dut.io.cs.poke(false.B)
       dut.io.cpol.poke(true.B) // CPOL = 1
       dut.io.cpha.poke(false.B) // CPHA = 0
@@ -102,7 +117,7 @@ class SPITest extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "correctly transmit and receive data with CPOL = 1 and CPHA = 1" in {
-    test(new SPI(8)) { dut =>
+    test(new SPI(8)).withAnnotations(annotations) { dut =>
       dut.io.cs.poke(false.B)
       dut.io.cpol.poke(true.B) // CPOL = 1
       dut.io.cpha.poke(true.B)  // CPHA = 1

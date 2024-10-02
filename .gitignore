@@ -45,3 +45,4 @@ bin/
 out
 generated
 *.anno.json
+test_run_dir
