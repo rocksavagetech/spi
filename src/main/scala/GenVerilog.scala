@@ -24,7 +24,7 @@ object Main extends App {
   // ######### Set Up Top Module HERE #########
   val top_name = "SPI.sv"
   val verilog = ChiselStage.emitSystemVerilog(
-    new SPI(),
+    new SPI(8, 1000000, SPIMode.Mode0, SPIRole.Slave),
     firtoolOpts = Array(
       "--lowering-options=disallowLocalVariables,disallowPackedArrays",
       "--disable-all-randomization",

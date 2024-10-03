@@ -3,88 +3,178 @@ package tech.rocksavage.chiselware.SPI
 import chisel3._
 import chisel3.util._
 
-class SPI(val width: Int = 8) extends Module {
+// SPI Mode Enum
+object SPIMode extends ChiselEnum {
+  val Mode0, Mode1, Mode2, Mode3 = Value
+}
+
+// SPI Master/Slave Enum
+object SPIRole extends ChiselEnum {
+  val Master, Slave = Value
+}
+
+// APB Interface Bundle (for processor communication)
+class APBBundle(dataWidth: Int) extends Bundle {
+  val paddr = Input(UInt(dataWidth.W))
+  val pwrite = Input(Bool())
+  val pwdata = Input(UInt(dataWidth.W))
+  val prdata = Output(UInt(dataWidth.W))
+  val penable = Input(Bool())
+  val psel = Input(Bool())
+}
+
+class SPIBundle(role: SPIRole.Type) extends Bundle {
+  val miso = role match {
+    case SPIRole.Master => Input(Bool())  // Master reads from MISO
+    case SPIRole.Slave => Output(Bool())  // Slave drives MISO
+  }
+  val mosi = role match {
+    case SPIRole.Master => Output(Bool()) // Master drives MOSI
+    case SPIRole.Slave => Input(Bool())   // Slave reads from MOSI
+  }
+  val sclk = role match {
+    case SPIRole.Master => Output(Bool()) // Master drives SCLK
+    case SPIRole.Slave => Input(Bool())   // Slave receives SCLK
+  }
+  val cs = role match {
+    case SPIRole.Master => Output(Bool()) // Master drives CS
+    case SPIRole.Slave => Input(Bool())   // Slave receives CS
+  }
+}
+
+class SPI(dataWidth: Int, clockFreq: Int, spiMode: SPIMode.Type, spiRole: SPIRole.Type) extends Module {
   val io = IO(new Bundle {
-    val cs       = Input(Bool())        // Chip Select
-    val cpol     = Input(Bool())        // Clock Polarity
-    val cpha     = Input(Bool())        // Clock Phase
-    val dataIn   = Input(UInt(width.W)) // Data to be transmitted
-    val transmit = Input(Bool())        // Start transmission
-    val mosi     = Output(UInt(1.W))    // Master Out Slave In
-    val miso     = Input(UInt(1.W))     // Master In Slave Out
-    val clock    = Output(Bool())       // Clock output
-    val dataOut  = Output(UInt(width.W))// Received data
-    val done     = Output(Bool())       // Transmission complete signal
+    val apb = new APBBundle(dataWidth)  // APB bus side
+    val spi = new SPIBundle(spiRole)    // SPI peripheral side depends on role
   })
 
-  // Internal states
-  val sIdle :: sTransmit :: sDone :: Nil = Enum(3)
-  val state = RegInit(sIdle)
-  val shiftReg = RegInit(0.U(width.W))
-  val counter = RegInit(0.U((log2Ceil(width) + 1).W)) // Adjusted counter width
-  val clockReg = RegInit(false.B)
+  // Registers and Flags
+  val spiReg = RegInit(0.U(dataWidth.W)) // Register to store data for transmission
+  val shiftCounter = RegInit(0.U((log2Ceil(dataWidth)+1).W)) // Counter to track shifting
 
-  // Outputs
-  io.mosi := shiftReg(width - 1) // Send MSB first
-  io.dataOut := 0.U
-  io.done := false.B
-  io.clock := clockReg
+  // SPI clock and data behavior based on mode
+  val sclkReg = RegInit(false.B)
+  val cpol = Wire(Bool())  // Clock Polarity
+  val cpha = Wire(Bool())  // Clock Phase
 
-  // Always assign default values
-  when(io.cs) {
-    state := sIdle
-    clockReg := io.cpol // Set clock polarity
-    io.done := false.B // Reset done when in idle
-  } .otherwise {
-    switch(state) {
-      is(sIdle) {
-        when(io.transmit) {
-          state := sTransmit
-          shiftReg := io.dataIn // Load data to shift register
-          counter := 0.U
-          clockReg := io.cpol   // Set initial clock state based on CPOL
-          io.done := false.B
-        }
-      }
+  // Set CPOL and CPHA based on spiMode
+  spiMode match {
+    case SPIMode.Mode0 => { cpol := false.B; cpha := false.B }
+    case SPIMode.Mode1 => { cpol := false.B; cpha := true.B }
+    case SPIMode.Mode2 => { cpol := true.B; cpha := false.B }
+    case SPIMode.Mode3 => { cpol := true.B; cpha := true.B }
+  }
 
-      is(sTransmit) {
-        when(counter < width.U) {
-          clockReg := !clockReg // Toggle clock
-
-          // Handle data shifting based on CPOL and CPHA
-          when(!io.cpha) {
-            // CPHA = 0: Sample on the leading clock edge (CPOL flip)
-            when(clockReg === !io.cpol) { // Leading edge (away from CPOL)
-              // Shift in the MISO bit only when it's time to sample
-              shiftReg := Cat(shiftReg(width - 2, 0), io.miso)
-              counter := counter + 1.U
-            }
-          } .otherwise {
-            // CPHA = 1: Sample on the trailing clock edge (CPOL match)
-            when(clockReg === io.cpol) { // Trailing edge (matching CPOL)
-              // Shift in the MISO bit only when it's time to sample
-              shiftReg := Cat(shiftReg(width - 2, 0), io.miso)
-              counter := counter + 1.U
-            }
-          }
-        } .otherwise {
-          // Output the final received data when transmission is done
-          io.dataOut := shiftReg
-          state := sDone
-        }
-      }
-
-      is(sDone) {
-        io.done := true.B // Ensure done signal is driven
-        when(!io.transmit) {
-          state := sIdle // Reset to idle state
-        }
-      }
+  // Clock generation (only for Master)
+  val sclkCounter = RegInit(0.U(log2Ceil(clockFreq).W))
+  when(spiRole === SPIRole.Master) {
+    when(sclkCounter === (clockFreq / 2 - 1).U) {
+      sclkReg := ~sclkReg
+      sclkCounter := 0.U
+    } .otherwise {
+      sclkCounter := sclkCounter + 1.U
     }
   }
 
-  // Ensure outputs are initialized in all states
-  io.done := (state === sDone) // Ensure done signal is driven
-  io.clock := clockReg // Ensure clock signal is driven
-  io.dataOut := shiftReg // Ensure dataOut is driven based on shiftReg
+  // Set default values for the SPI interface, but only if they are outputs
+  spiRole match {
+    case SPIRole.Master =>
+      // In Master mode, we can drive the output signals
+      io.spi.mosi := false.B // Master drives MOSI
+      io.spi.sclk := false.B // Master drives SCLK
+      io.spi.cs := true.B    // Master drives CS
+    case SPIRole.Slave =>
+      // In Slave mode, we can drive the appropriate output signals
+      io.spi.miso := false.B // Slave drives MISO
+      io.spi.sclk := DontCare // SCLK is input, we shouldn't drive it
+      io.spi.cs := DontCare   // CS is input, we shouldn't drive it
+  }
+
+  // MISO and MOSI behavior based on the role (Master or Slave)
+  spiRole match {
+    case SPIRole.Master =>
+      // Master mode
+      io.spi.sclk := sclkReg ^ cpol // Adjust SCLK based on CPOL
+
+      // Load new data from APB to SPI register and reset shift counter
+      when(io.apb.psel && io.apb.pwrite && io.apb.penable) {
+        spiReg := io.apb.pwdata
+        shiftCounter := (dataWidth).U // Start with the MSB
+      }
+
+      // Shift data out (MOSI) based on the mode and clock phase (CPHA)
+      when(shiftCounter =/= 0.U) {
+        when(!cpha) {
+          // CPHA = 0 (Mode 0 and Mode 2)
+          // Mode 0: Shift on rising edge (CPOL=0)
+          // Mode 2: Shift on falling edge (CPOL=1)
+          when((!cpol && sclkReg === false.B) || (cpol && sclkReg === false.B)) {
+            io.spi.mosi := spiReg(dataWidth - 1) // Shift out MSB on MOSI
+            spiReg := Cat(spiReg(dataWidth - 2, 0), 0.U(1.W)) // Shift left
+            shiftCounter := shiftCounter - 1.U // Decrement counter
+          }
+        } .otherwise {
+          // CPHA = 1 (Mode 1 and Mode 3)
+          // Mode 1: Shift on falling edge (CPOL=0)
+          // Mode 3: Shift on rising edge (CPOL=1)
+          when((!cpol && sclkReg === false.B) || (cpol && sclkReg === false.B)) {
+            io.spi.mosi := spiReg(dataWidth - 1) // Shift out MSB on MOSI
+            spiReg := Cat(spiReg(dataWidth - 2, 0), 0.U(1.W)) // Shift left
+            shiftCounter := shiftCounter - 1.U // Decrement counter
+          }
+        }
+      } .otherwise {
+        io.spi.mosi := false.B // Default MOSI output when not shifting
+      }
+
+    case SPIRole.Slave =>
+      // Initialize MISO as driving the MSB of spiReg
+      io.spi.miso := spiReg(dataWidth - 1)
+
+      when(io.spi.cs === false.B) { // Slave is selected when CS is low
+        // Capture data on appropriate clock edge based on SPI mode
+        when(cpol === false.B && cpha === false.B) {
+          // Mode 0: Capture data on rising edge of SCLK
+          when(io.spi.sclk) {
+            spiReg := Cat(spiReg(dataWidth - 2, 0), io.spi.mosi) // Shift in MOSI data
+            shiftCounter := shiftCounter + 1.U
+          }
+        } .elsewhen(cpol === false.B && cpha === true.B) {
+          // Mode 1: Capture data on falling edge of SCLK
+          when(!io.spi.sclk) {
+            spiReg := Cat(spiReg(dataWidth - 2, 0), io.spi.mosi) // Shift in MOSI data
+            shiftCounter := shiftCounter + 1.U
+          }
+        } .elsewhen(cpol === true.B && cpha === false.B) {
+          // Mode 2: Capture data on rising edge of SCLK
+          when(io.spi.sclk) {
+            spiReg := Cat(spiReg(dataWidth - 2, 0), io.spi.mosi) // Shift in MOSI data
+            shiftCounter := shiftCounter + 1.U
+          }
+        } .elsewhen(cpol === true.B && cpha === true.B) {
+          // Mode 3: Capture data on falling edge of SCLK
+          when(!io.spi.sclk) {
+            spiReg := Cat(spiReg(dataWidth - 2, 0), io.spi.mosi) // Shift in MOSI data
+            shiftCounter := shiftCounter + 1.U
+          }
+        }
+
+        // Check if a full byte has been received
+        when(shiftCounter === (dataWidth - 1).U) {
+          io.apb.prdata := spiReg // Output the full byte to APB
+          shiftCounter := 0.U // Reset counter after transmission
+        } .otherwise {
+          io.apb.prdata := 0.U // Default value if not yet full byte
+        }
+      } .otherwise {
+        // Reset logic when CS is high
+        shiftCounter := 0.U
+        spiReg := 0.U // Optionally reset spiReg when not selected
+        io.apb.prdata := 0.U // Default value when not selected
+      }
+
+  }
+
+  // Output the received data back to APB
+  io.apb.prdata := spiReg
 }

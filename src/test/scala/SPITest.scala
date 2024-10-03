@@ -1,139 +1,118 @@
 package tech.rocksavage.chiselware.SPI
 
+import org.scalatest.Assertions._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+
 import chisel3._
 import chisel3.util._
 import chiseltest._
+import chiseltest.coverage._
 import chiseltest.simulator.VerilatorCFlags
-class SPITest extends AnyFlatSpec with ChiselScalatestTester with Matchers {
-  
-  // Utility function to simulate SPI clock and data shifts
-  def simulateSPIClockAndData(dut: SPI, cpol: Boolean, cpha: Boolean, data: UInt): Unit = {
-    for (i <- 0 until 8) {
-      if (cpol) {
-        if (cpha) {
-          // CPOL = 1, CPHA = 1: sample on rising edge, change on falling edge
-          dut.clock.step(1) // Falling edge, change data
-          dut.io.miso.poke(dut.io.mosi.peek()) // Set MISO
-          dut.clock.step(1) // Rising edge, sample data
-        } else {
-          // CPOL = 1, CPHA = 0: sample on falling edge, change on rising edge
-          dut.io.miso.poke(dut.io.mosi.peek()) // Set MISO before falling edge
-          dut.clock.step(1) // Falling edge, sample data
-          dut.clock.step(1) // Rising edge, change data
-        }
-      } else {
-        if (cpha) {
-          // CPOL = 0, CPHA = 1: sample on falling edge, change on rising edge
-          dut.clock.step(1) // Rising edge, change data
-          dut.io.miso.poke(dut.io.mosi.peek()) // Set MISO
-          dut.clock.step(1) // Falling edge, sample data
-        } else {
-          // CPOL = 0, CPHA = 0: sample on rising edge, change on falling edge
-          dut.io.miso.poke(dut.io.mosi.peek()) // Set MISO before rising edge
-          dut.clock.step(1) // Rising edge, sample data
-          dut.clock.step(1) // Falling edge, change data
-        }
-      }
-      // expect data to be shifted in
-      val actual = dut.io.dataOut.peek()(7).litValue
-      val expected = data(7-i).litValue
+import firrtl2.options.TargetDirAnnotation
 
-      println(s"actual: ${actual}")
-      println(s"expected: ${expected}")
+class SPIModuleTest extends AnyFlatSpec with ChiselScalatestTester {
+  behavior of "SPIModule"
 
-      require(actual == expected)
-    }
-  }
-
-  val annotations = Seq(
-    VerilatorBackendAnnotation,
+  val backendAnnotations = Seq(
+    // VerilatorBackendAnnotation,
     VerilatorCFlags(Seq("--std=c++17")),
-    WriteFstAnnotation
+    WriteFstAnnotation,
   )
 
-  "SPI" should "correctly transmit and receive data with CPOL = 0 and CPHA = 0" in {
-    test(new SPI(8)).withAnnotations(annotations) { dut =>
-      dut.io.cs.poke(false.B)
-      dut.io.cpol.poke(false.B) // CPOL = 0
-      dut.io.cpha.poke(false.B) // CPHA = 0
-      dut.io.dataIn.poke(31.U)  // Input data: 0b11111
-      dut.io.transmit.poke(true.B)
+  // Helper function to run the master-slave transmission
+  def runMasterTransmission(dut: SPI, mode: SPIMode.Type): Unit = {
+    // Write data from APB to SPI
+    dut.io.apb.pwdata.poke(0xA5.U)
+    dut.io.apb.psel.poke(true.B)
+    dut.io.apb.pwrite.poke(true.B)
+    dut.io.apb.penable.poke(true.B)
 
-      // Simulate clock and data shifts
-      simulateSPIClockAndData(dut, cpol = false, cpha = false, data = 31.U)
-
-      // End transmission
-      dut.io.transmit.poke(false.B)
+    // Check if data is being shifted out correctly on MOSI
+    for (i <- 7 until -1) {
       dut.clock.step(1)
-
-      // Check received data
-      dut.io.dataOut.peek().litValue shouldEqual 31
-      dut.io.done.peek().litToBoolean shouldEqual true
+      println(s"MOSI: ${dut.io.spi.mosi.peek().litValue}")
+      dut.io.spi.mosi.expect(0xA5.U & (1 << i).U)
     }
   }
 
-  it should "correctly transmit and receive data with CPOL = 0 and CPHA = 1" in {
-    test(new SPI(8)).withAnnotations(annotations) { dut =>
-      dut.io.cs.poke(false.B)
-      dut.io.cpol.poke(false.B) // CPOL = 0
-      dut.io.cpha.poke(true.B)  // CPHA = 1
-      dut.io.dataIn.poke(31.U)
-      dut.io.transmit.poke(true.B)
-
-      // Simulate clock and data shifts
-      simulateSPIClockAndData(dut, cpol = false, cpha = true, data = 31.U)
-
-      // End transmission
-      dut.io.transmit.poke(false.B)
-      dut.clock.step(1)
-
-      // Check received data
-      dut.io.dataOut.peek().litValue shouldEqual 31
-      dut.io.done.peek().litToBoolean shouldEqual true
+  // Tests for Mode 0
+  it should "work as an SPI master in Mode0" in {
+    test(new SPI(8, 1000000, SPIMode.Mode0, SPIRole.Master)).withAnnotations(backendAnnotations) { dut =>
+      runMasterTransmission(dut, SPIMode.Mode0)
     }
   }
 
-  it should "correctly transmit and receive data with CPOL = 1 and CPHA = 0" in {
-    test(new SPI(8)).withAnnotations(annotations) { dut =>
-      dut.io.cs.poke(false.B)
-      dut.io.cpol.poke(true.B) // CPOL = 1
-      dut.io.cpha.poke(false.B) // CPHA = 0
-      dut.io.dataIn.poke(31.U)
-      dut.io.transmit.poke(true.B)
-
-      // Simulate clock and data shifts
-      simulateSPIClockAndData(dut, cpol = true, cpha = false, data = 31.U)
-
-      // End transmission
-      dut.io.transmit.poke(false.B)
-      dut.clock.step(1)
-
-      // Check received data
-      dut.io.dataOut.peek().litValue shouldEqual 31
-      dut.io.done.peek().litToBoolean shouldEqual true
+  it should "work as an SPI slave in Mode0" in {
+    test(new SPI(8, 1000000, SPIMode.Mode0, SPIRole.Slave)).withAnnotations(backendAnnotations) { dut =>
+      for (i <- 0 until 8) {
+        dut.io.spi.mosi.poke((i % 2 == 0).B)
+        dut.io.spi.sclk.poke(false.B)
+        dut.clock.step(1)
+        dut.io.spi.sclk.poke(true.B)
+        dut.clock.step(1)
+      }
+      dut.io.apb.prdata.expect(0xaa.U)
     }
   }
 
-  it should "correctly transmit and receive data with CPOL = 1 and CPHA = 1" in {
-    test(new SPI(8)).withAnnotations(annotations) { dut =>
-      dut.io.cs.poke(false.B)
-      dut.io.cpol.poke(true.B) // CPOL = 1
-      dut.io.cpha.poke(true.B)  // CPHA = 1
-      dut.io.dataIn.poke(31.U)
-      dut.io.transmit.poke(true.B)
+  // Tests for Mode 1
+  it should "work as an SPI master in Mode1" in {
+    test(new SPI(8, 1000000, SPIMode.Mode1, SPIRole.Master)).withAnnotations(backendAnnotations) { dut =>
+      runMasterTransmission(dut, SPIMode.Mode1)
+    }
+  }
 
-      // Simulate clock and data shifts
-      simulateSPIClockAndData(dut, cpol = true, cpha = true, data = 31.U)
+  it should "work as an SPI slave in Mode1" in {
+    test(new SPI(8, 1000000, SPIMode.Mode1, SPIRole.Slave)).withAnnotations(backendAnnotations) { dut =>
+      for (i <- 0 until 8) {
+        dut.io.spi.mosi.poke((i % 2 == 0).B)
+        dut.io.spi.sclk.poke(true.B)
+        dut.clock.step(1)
+        dut.io.spi.sclk.poke(false.B)
+        dut.clock.step(1)
+      }
+      dut.io.apb.prdata.expect(0xaa.U)
+    }
+  }
 
-      // End transmission
-      dut.io.transmit.poke(false.B)
-      dut.clock.step(1)
+  // Tests for Mode 2
+  it should "work as an SPI master in Mode2" in {
+    test(new SPI(8, 1000000, SPIMode.Mode2, SPIRole.Master)).withAnnotations(backendAnnotations) { dut =>
+      runMasterTransmission(dut, SPIMode.Mode2)
+    }
+  }
 
-      // Check received data
-      dut.io.dataOut.peek().litValue shouldEqual 31
-      dut.io.done.peek().litToBoolean shouldEqual true
+  it should "work as an SPI slave in Mode2" in {
+    test(new SPI(8, 1000000, SPIMode.Mode2, SPIRole.Slave)).withAnnotations(backendAnnotations) { dut =>
+      for (i <- 0 until 8) {
+        dut.io.spi.mosi.poke((i % 2 == 0).B)
+        dut.io.spi.sclk.poke(false.B)
+        dut.clock.step(1)
+        dut.io.spi.sclk.poke(true.B)
+        dut.clock.step(1)
+      }
+      dut.io.apb.prdata.expect(0xaa.U)
+    }
+  }
+
+  // Tests for Mode 3
+  it should "work as an SPI master in Mode3" in {
+    test(new SPI(8, 1000000, SPIMode.Mode3, SPIRole.Master)).withAnnotations(backendAnnotations) { dut =>
+      runMasterTransmission(dut, SPIMode.Mode3)
+    }
+  }
+
+  it should "work as an SPI slave in Mode3" in {
+    test(new SPI(8, 1000000, SPIMode.Mode3, SPIRole.Slave)).withAnnotations(backendAnnotations) { dut =>
+      for (i <- 0 until 8) {
+        dut.io.spi.mosi.poke((i % 2 == 0).B)
+        dut.io.spi.sclk.poke(true.B)
+        dut.clock.step(1)
+        dut.io.spi.sclk.poke(false.B)
+        dut.clock.step(1)
+      }
+      dut.io.apb.prdata.expect(0xaa.U)
     }
   }
 }
