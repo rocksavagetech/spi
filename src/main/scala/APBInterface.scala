@@ -12,6 +12,6 @@ class ApbInterface(p: BaseParams) extends Bundle {
   val PADDR = Input(UInt(p.addrWidth.W)) // Address
   val PWDATA = Input(UInt(p.dataWidth.W)) // Write data
   val PRDATA = Output(UInt(p.dataWidth.W)) // Read data
-  // val PREADY = Output(Bool()) // Ready signal
+  val PREADY = Output(Bool()) // Ready signal
   // val PSLVERR = Output(Bool()) // Slave error signal
 }

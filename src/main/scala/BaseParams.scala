@@ -4,6 +4,11 @@ import chisel3._
 import chisel3.util._
 
 case class BaseParams(
-    dataWidth: Int = 32,
-    addrWidth: Int = 32
-)
+    spiMaster: Boolean = true,
+    spiMode: Int = 1, // Only valid for ranges 1 - 4
+    clockFreq: Int = 1000,
+    dataWidth: Int = 8,
+    addrWidth: Int = 8
+) {
+  require(spiMode <= 4 && spiMode >= 1, "spiMode must be in range 1-4")
+}
