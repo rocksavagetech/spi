@@ -6,7 +6,7 @@ import chisel3.util._
 case class BaseParams(
     spiMaster: Boolean = true,
     spiMode: Int = 1, // Only valid for ranges 1 - 4
-    clockFreq: Int = 1000,
+    clockFreq: Int = 2, //2 = 50 MHz
     dataWidth: Int = 8,
     addrWidth: Int = 8
 ) {
