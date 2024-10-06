@@ -17,6 +17,10 @@ object Main extends App {
   if (output == null) output = "out"
   val outputDir = s"$output/generated"
 
+  val myParams = BaseParams(
+    dataWidth = 32,
+    addrWidth = 32
+  )
   // if output dir does not exist, make path
   val javaOutputDir = new java.io.File(outputDir)
   if (!javaOutputDir.exists) javaOutputDir.mkdirs
@@ -24,7 +28,7 @@ object Main extends App {
   // ######### Set Up Top Module HERE #########
   val top_name = "SPI.sv"
   val verilog = ChiselStage.emitSystemVerilog(
-    new SPI(8, 1000000, SPIMode.Mode0, SPIRole.Slave),
+    new SPI(myParams, 1000000, SPIMode.Mode0, SPIRole.Slave),
     firtoolOpts = Array(
       "--lowering-options=disallowLocalVariables,disallowPackedArrays",
       "--disable-all-randomization",
