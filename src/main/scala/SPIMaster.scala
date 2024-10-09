@@ -20,6 +20,13 @@ class SPIMaster(p: BaseParams) extends Module {
   val sclkReg = RegInit(false.B)
   val prevClk = RegInit(false.B)
 
+  // Transmit and Recieve Buffer
+  val transmitBuffer = RegInit(VecInit(Seq.fill(8)(0.U(p.dataWidth.W))))
+  val transmitIndex = RegInit(0.U(3.W))
+
+  val recieveBuffer = RegInit(VecInit(Seq.fill(8)(0.U(p.dataWidth.W))))
+  val recieveIndex = RegInit(0.U(3.W))
+
   // Clock generation
   val sclkCounter = RegInit(0.U(log2Ceil(p.clockFreq).W))
   when(sclkCounter === (p.clockFreq / 2 - 1).U) {
@@ -32,35 +39,52 @@ class SPIMaster(p: BaseParams) extends Module {
 
   io.pins.sclk := sclkReg
   object State extends ChiselEnum {
-    val IDLE, DUPLEX = Value
+    val IDLE, BUFFER, DUPLEX = Value
   }
   import State._
 
   val stateReg = RegInit(IDLE)
   io.apb.PRDATA := 0.U
 
+  when(io.apb.PSEL && io.apb.PENABLE) {
+    when(io.apb.PWRITE) {
+      registerWrite(io.apb.PADDR)
+    }.otherwise {
+      registerRead(io.apb.PADDR)
+    }
+  }
+
   switch(stateReg) {
     is(IDLE) {
       printf("IDLE\n")
       shiftCounter := 0.U
-      sclkReg := !((p.spiMode == 1).B || (p.spiMode == 2).B)
-      when(io.apb.PSEL && io.apb.PENABLE) {
-        when(io.apb.PWRITE) {
-          spiTransmit := io.apb.PWDATA
-          stateReg := DUPLEX
-        }.otherwise {
-          io.apb.PRDATA := spiTransmit
-          stateReg := IDLE
-        }
+      sclkReg := !((regs
+        .CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
+      when((regs.DATA.orR === 1.U) && (regs.CTRLB(6) === 0.U)) {
+        stateReg := DUPLEX
+      }.elsewhen((regs.DATA.orR === 1.U) && (regs.CTRLB(6) === 1.U)) {
+        stateReg := BUFFER
       }.otherwise {
         stateReg := IDLE
       }
     }
+    is(BUFFER) {
+      when(io.apb.PWRITE) {
+        transmitBuffer(transmitIndex) := regs.DATA
+        transmitIndex := transmitIndex + 1.U
+      }.otherwise {
+        recieveIndex := recieveIndex + 1.U
+      }
+    }
     is(DUPLEX) {
-      when((p.spiMode == 1).B || (p.spiMode == 4).B) { // Sample on Rising Edge
+      when((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U)) { // Sample on Rising Edge
         when(~prevClk & sclkReg) {
           when(shiftCounter < (p.dataWidth).U) {
-            spiTransmit := io.pins.miso ## spiTransmit(p.dataWidth - 1, 1)
+            when(regs.CTRLA(5) === 1.U) {
+              spiTransmit := io.pins.miso ## spiTransmit(p.dataWidth - 1, 1)
+            }.otherwise {
+              spiTransmit := spiTransmit(p.dataWidth - 1, 1) ## io.pins.miso
+            }
             printf("TRANSMIT: %x\n", spiTransmit(0))
             shiftCounter := shiftCounter + 1.U
             stateReg := DUPLEX
