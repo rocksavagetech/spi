@@ -15,8 +15,7 @@ class SPIMaster(p: BaseParams) extends Module {
   })
   val regs = new SPIRegs(p)
 
-  val spiRegTransmit = RegInit(0.U(p.dataWidth.W))
-  val spiRegRecieve = RegInit(0.U(p.dataWidth.W))
+  val spiTransmit = RegInit(0.U(p.dataWidth.W))
   val shiftCounter = RegInit(0.U((log2Ceil(p.dataWidth) + 1).W))
   val sclkReg = RegInit(false.B)
   val prevClk = RegInit(false.B)
@@ -43,16 +42,14 @@ class SPIMaster(p: BaseParams) extends Module {
   switch(stateReg) {
     is(IDLE) {
       printf("IDLE\n")
-      spiRegTransmit := 0.U
       shiftCounter := 0.U
       sclkReg := !((p.spiMode == 1).B || (p.spiMode == 2).B)
       when(io.apb.PSEL && io.apb.PENABLE) {
         when(io.apb.PWRITE) {
-          spiRegRecieve := 0.U
-          spiRegTransmit := io.apb.PWDATA
+          spiTransmit := io.apb.PWDATA
           stateReg := DUPLEX
         }.otherwise {
-          io.apb.PRDATA := spiRegRecieve
+          io.apb.PRDATA := spiTransmit
           stateReg := IDLE
         }
       }.otherwise {
@@ -63,9 +60,8 @@ class SPIMaster(p: BaseParams) extends Module {
       when((p.spiMode == 1).B || (p.spiMode == 4).B) { // Sample on Rising Edge
         when(~prevClk & sclkReg) {
           when(shiftCounter < (p.dataWidth).U) {
-            spiRegTransmit := 0.U ## spiRegTransmit(p.dataWidth - 1, 1)
-            spiRegRecieve := (spiRegRecieve >> 1) | (io.pins.miso << (p.dataWidth - 1))
-            printf("TRANSMIT: %x\n", spiRegTransmit(0))
+            spiTransmit := io.pins.miso ## spiTransmit(p.dataWidth - 1, 1)
+            printf("TRANSMIT: %x\n", spiTransmit(0))
             shiftCounter := shiftCounter + 1.U
             stateReg := DUPLEX
           }.otherwise {
@@ -75,9 +71,8 @@ class SPIMaster(p: BaseParams) extends Module {
       }.otherwise {
         when(prevClk & ~sclkReg) { // Sample on Falling Edge
           when(shiftCounter < (p.dataWidth).U) {
-            spiRegTransmit := 0.U ## spiRegTransmit(p.dataWidth - 1, 1)
-            spiRegRecieve := (spiRegRecieve >> 1) | (io.pins.miso << (p.dataWidth - 1))
-            printf("TRANSMIT: %x\n", spiRegTransmit(0))
+            spiTransmit := io.pins.miso ## spiTransmit(p.dataWidth - 1, 1)
+            printf("TRANSMIT: %x\n", spiTransmit(0))
             shiftCounter := shiftCounter + 1.U
             stateReg := DUPLEX
           }.otherwise {
@@ -87,7 +82,7 @@ class SPIMaster(p: BaseParams) extends Module {
       }
     }
   }
-  io.pins.mosi := spiRegTransmit(0)
+  io.pins.mosi := spiTransmit(0)
   io.apb.PREADY := (io.apb.PENABLE && io.apb.PSEL)
   io.pins.cs := (stateReg === IDLE)
   when(io.apb.PSEL && io.apb.PENABLE && (stateReg === DUPLEX)) {
@@ -97,15 +92,18 @@ class SPIMaster(p: BaseParams) extends Module {
   }
 
   def registerWrite(addr: UInt): Unit = {
-    //Probably need all regs except DATA to be locked to 1 Byte
-     when(addr >= regs.CTRLA_ADDR.U && addr <= regs.CTRLA_ADDR_MAX.U) {
+    // Probably need all regs except DATA to be locked to 1 Byte
+    when(addr >= regs.CTRLA_ADDR.U && addr <= regs.CTRLA_ADDR_MAX.U) {
       printf(
         "Writing CTRLA Register, data: %x, addr: %x\n",
         io.apb.PWDATA,
         addr
       )
-      val shiftAddr = (addr - regs.CTRLA_ADDR.U) 
-      regs.CTRLA := (io.apb.PWDATA(regs.CTRLA_SIZE - 1, 0) << (shiftAddr(regs.CTRLA_REG_SIZE - 1, 0) * 8.U))
+      val shiftAddr = (addr - regs.CTRLA_ADDR.U)
+      regs.CTRLA := (io.apb.PWDATA(regs.CTRLA_SIZE - 1, 0) << (shiftAddr(
+        regs.CTRLA_REG_SIZE - 1,
+        0
+      ) * 8.U))
     }
     when(addr >= regs.CTRLB_ADDR.U && addr <= regs.CTRLB_ADDR_MAX.U) {
       printf(
@@ -113,8 +111,11 @@ class SPIMaster(p: BaseParams) extends Module {
         io.apb.PWDATA,
         addr
       )
-      val shiftAddr = (addr - regs.CTRLB_ADDR.U) 
-      regs.CTRLB := (io.apb.PWDATA(regs.CTRLB_SIZE - 1, 0) << (shiftAddr(regs.CTRLB_REG_SIZE - 1, 0) * 8.U))
+      val shiftAddr = (addr - regs.CTRLB_ADDR.U)
+      regs.CTRLB := (io.apb.PWDATA(regs.CTRLB_SIZE - 1, 0) << (shiftAddr(
+        regs.CTRLB_REG_SIZE - 1,
+        0
+      ) * 8.U))
     }
     when(addr >= regs.INTCTRL_ADDR.U && addr <= regs.INTCTRL_ADDR_MAX.U) {
       printf(
@@ -123,12 +124,22 @@ class SPIMaster(p: BaseParams) extends Module {
         addr
       )
       val shiftAddr = (addr - regs.INTCTRL_ADDR.U)
-      regs.INTCTRL := (io.apb.PWDATA(regs.INTCTRL_SIZE - 1, 0) << (shiftAddr(regs.INTCTRL_REG_SIZE - 1, 0) * 8.U))
+      regs.INTCTRL := (io.apb.PWDATA(regs.INTCTRL_SIZE - 1, 0) << (shiftAddr(
+        regs.INTCTRL_REG_SIZE - 1,
+        0
+      ) * 8.U))
     }
     when(addr >= regs.INTFLAGS_ADDR.U && addr <= regs.INTFLAGS_ADDR_MAX.U) {
-      printf("Writing INTFLAGS Register, data: %x, addr: %x\n", io.apb.PWDATA, addr)
+      printf(
+        "Writing INTFLAGS Register, data: %x, addr: %x\n",
+        io.apb.PWDATA,
+        addr
+      )
       val shiftAddr = (addr - regs.INTFLAGS_ADDR.U)
-      regs.INTFLAGS := (io.apb.PWDATA(regs.INTFLAGS_SIZE - 1, 0) << (shiftAddr(regs.INTFLAGS_REG_SIZE - 1, 0) * 8.U))
+      regs.INTFLAGS := (io.apb.PWDATA(regs.INTFLAGS_SIZE - 1, 0) << (shiftAddr(
+        regs.INTFLAGS_REG_SIZE - 1,
+        0
+      ) * 8.U))
     }
     when(
       addr >= regs.DATA_ADDR.U && addr <= regs.DATA_ADDR_MAX.U
@@ -139,7 +150,10 @@ class SPIMaster(p: BaseParams) extends Module {
         addr
       )
       val shiftAddr = (addr - regs.DATA_ADDR.U)
-      regs.DATA := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(regs.DATA_REG_SIZE - 1, 0) * 8.U))
+      regs.DATA := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(
+        regs.DATA_REG_SIZE - 1,
+        0
+      ) * 8.U))
     }
   }
 
@@ -157,11 +171,19 @@ class SPIMaster(p: BaseParams) extends Module {
       io.apb.PRDATA := regs.CTRLB
     }
     when(addr >= regs.INTCTRL_ADDR.U && addr <= regs.INTCTRL_ADDR_MAX.U) {
-      printf("Reading INTCTRL Register, data: %x, addr: %x\n", regs.INTCTRL, addr)
+      printf(
+        "Reading INTCTRL Register, data: %x, addr: %x\n",
+        regs.INTCTRL,
+        addr
+      )
       io.apb.PRDATA := regs.INTCTRL
     }
     when(addr >= regs.INTFLAGS_ADDR.U && addr <= regs.INTFLAGS_ADDR_MAX.U) {
-      printf("Reading INTFLAGS Register, data: %x, addr: %x\n", regs.INTFLAGS, addr)
+      printf(
+        "Reading INTFLAGS Register, data: %x, addr: %x\n",
+        regs.INTFLAGS,
+        addr
+      )
       io.apb.PRDATA := regs.INTFLAGS
     }
     when(addr >= regs.DATA_ADDR.U && addr <= regs.DATA_ADDR_MAX.U) {
