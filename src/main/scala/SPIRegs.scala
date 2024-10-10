@@ -18,7 +18,7 @@ class SPIRegs(p: BaseParams) extends Bundle {
   val CTRLB = RegInit(0.U(CTRLB_SIZE.W))
   val INTCTRL = RegInit(0.U(INTCTRL_SIZE.W))
   val INTFLAGS = RegInit(0.U(INTFLAGS_SIZE.W))
-  val DATA = RegInit(0.U(DATA_SIZE.W))
+  //val DATA = RegInit(0.U(DATA_SIZE.W)) Not a physical register
   // #####################################################################
 
   // Should always be 8

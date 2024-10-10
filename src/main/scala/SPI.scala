@@ -14,7 +14,7 @@ class SPI(p: BaseParams) extends Module {
   val regs = new SPIRegs(p)
 
   // Shift Register
-  val spiTransmit = RegInit(0.U(p.dataWidth.W))
+  val spiShift = RegInit(0.U(p.dataWidth.W))
   val shiftCounter = RegInit(0.U((log2Ceil(p.dataWidth) + 1).W))
 
   // Flags
@@ -27,7 +27,9 @@ class SPI(p: BaseParams) extends Module {
 
   val recieveBuffer = RegInit(VecInit(Seq.fill(8)(0.U(p.dataWidth.W))))
   val recieveIndex = RegInit(0.U(3.W))
-  val recieveReg = RegInit(0.U(p.dataWidth.W))  //Recieve has one reg buffer even in Normal Mode
+  val recieveReg = RegInit(
+    0.U(p.dataWidth.W)
+  ) // Recieve has one reg buffer even in Normal Mode
 
   // Master Clock generation
   val sclkReg = RegInit(false.B)
@@ -62,7 +64,8 @@ class SPI(p: BaseParams) extends Module {
 
   // State Machine Initialization
   object State extends ChiselEnum {
-    val idle, normalMaster, bufferMaster, normalSlave, bufferSlave = Value
+    val idle, normalMaster, bufferMaster, normalSlave, bufferSlave, normalDone,
+        bufferDone = Value
   }
   import State._
   val stateReg = RegInit(idle)
@@ -78,7 +81,7 @@ class SPI(p: BaseParams) extends Module {
   }
 
   // Signal Control
-  io.master.mosi := spiTransmit(0)
+  io.master.mosi := spiShift(0)
   io.apb.PREADY := (io.apb.PENABLE && io.apb.PSEL)
   io.master.cs := (stateReg === idle)
   io.apb.PSLVERR := 0.U
@@ -112,33 +115,40 @@ class SPI(p: BaseParams) extends Module {
         when(~prevClk & sclkReg) {
           when(shiftCounter < (p.dataWidth).U) {
             when(regs.CTRLA(6) === 1.U) {
-              spiTransmit := io.master.miso ## spiTransmit(p.dataWidth - 1, 1)
+              spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
             }.otherwise {
-              spiTransmit := spiTransmit(p.dataWidth - 1, 1) ## io.master.miso
+              spiShift := spiShift(p.dataWidth - 1, 1) ## io.master.miso
             }
-            printf("TRANSMIT: %x\n", spiTransmit(0))
+            printf("TRANSMIT: %x\n", spiShift(0))
             shiftCounter := shiftCounter + 1.U
             stateReg := normalMaster
           }.otherwise {
-            stateReg := idle
+            stateReg := normalDone
           }
         }
       }.otherwise {
         when(prevClk & ~sclkReg) { // Sample on Falling Edge
           when(shiftCounter < (p.dataWidth).U) {
             when(regs.CTRLA(6) === 1.U) {
-              spiTransmit := io.master.miso ## spiTransmit(p.dataWidth - 1, 1)
+              spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
             }.otherwise {
-              spiTransmit := spiTransmit(p.dataWidth - 1, 1) ## io.master.miso
+              spiShift := spiShift(p.dataWidth - 1, 1) ## io.master.miso
             }
-            printf("TRANSMIT: %x\n", spiTransmit(0))
+            printf("TRANSMIT: %x\n", spiShift(0))
             shiftCounter := shiftCounter + 1.U
             stateReg := normalMaster
           }.otherwise {
-            stateReg := idle
+            stateReg := normalDone
           }
         }
       }
+    }
+    is(normalDone) {
+      recieveReg := spiShift
+      when (regs.INTCTRL(0) === 1.U) {  //When interrupts are enabled
+        regs.INTFLAGS := regs.INTFLAGS | (1.U << 7.U) //Set it
+      }
+      stateReg := idle
     }
   }
 
@@ -187,10 +197,7 @@ class SPI(p: BaseParams) extends Module {
         addr
       )
       val shiftAddr = (addr - regs.INTFLAGS_ADDR.U)
-      regs.INTFLAGS := (io.apb.PWDATA(regs.INTFLAGS_SIZE - 1, 0) << (shiftAddr(
-        regs.INTFLAGS_REG_SIZE - 1,
-        0
-      ) * 8.U))
+      regs.INTFLAGS := regs.INTFLAGS & ~(io.apb.PWDATA(regs.INTFLAGS_SIZE - 1, 0) << (shiftAddr(regs.INTFLAGS_REG_SIZE - 1, 0) * 8.U)) //Writing a 1 will clear the interrupt status
     }
     when(
       addr >= regs.DATA_ADDR.U && addr <= regs.DATA_ADDR_MAX.U
@@ -202,7 +209,7 @@ class SPI(p: BaseParams) extends Module {
       )
       writeData := true.B
       val shiftAddr = (addr - regs.DATA_ADDR.U)
-      regs.DATA := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(
+      spiShift := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(
         regs.DATA_REG_SIZE - 1,
         0
       ) * 8.U))
@@ -237,13 +244,10 @@ class SPI(p: BaseParams) extends Module {
         addr
       )
       io.apb.PRDATA := regs.INTFLAGS
-      when(regs.INTFLAGS(6) === 1.U) {
-        regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 6.U) // Clear error flag once read
-      }
     }
     when(addr >= regs.DATA_ADDR.U && addr <= regs.DATA_ADDR_MAX.U) {
-      printf("Reading DATA Register, data: %x, addr: %x\n", regs.DATA, addr)
-      io.apb.PRDATA := regs.DATA
+      printf("Reading DATA Register, data: %x, addr: %x\n", recieveReg, addr)
+      io.apb.PRDATA := recieveReg
       readData := true.B
     }
   }
