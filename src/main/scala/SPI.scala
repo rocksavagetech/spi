@@ -27,6 +27,7 @@ class SPI(p: BaseParams) extends Module {
 
   val recieveBuffer = RegInit(VecInit(Seq.fill(8)(0.U(p.dataWidth.W))))
   val recieveIndex = RegInit(0.U(3.W))
+  val recieveReg = RegInit(0.U(p.dataWidth.W))  //Recieve has one reg buffer even in Normal Mode
 
   // Master Clock generation
   val sclkReg = RegInit(false.B)
@@ -44,7 +45,8 @@ class SPI(p: BaseParams) extends Module {
       1.U -> 2.U(8.W)
     )
     when(
-      sclkCounter === ((prescalerMap.getOrElse(regs.CTRLA(1, 0), 4.U) / clk2xMap.getOrElse(regs.CTRLA(4), 1.U)) - 1.U)
+      sclkCounter === ((prescalerMap.getOrElse(regs.CTRLA(1, 0), 4.U) / clk2xMap
+        .getOrElse(regs.CTRLA(4), 1.U)) - 1.U)
     ) {
       prevClk := sclkReg
       sclkReg := ~sclkReg
@@ -53,19 +55,20 @@ class SPI(p: BaseParams) extends Module {
       sclkCounter := sclkCounter + 1.U
     }
     io.master.sclk := sclkReg
-  }.otherwise { //Temporary to pass build
+  }.otherwise { // Temporary to pass build
     io.master.sclk := 0.U
   }
   io.slave.miso := 0.U
 
+  // State Machine Initialization
   object State extends ChiselEnum {
-    val IDLE, MASTER, SLAVE = Value
+    val idle, normalMaster, bufferMaster, normalSlave, bufferSlave = Value
   }
   import State._
-
-  val stateReg = RegInit(IDLE)
+  val stateReg = RegInit(idle)
   io.apb.PRDATA := 0.U
 
+  // Control Register Read/Write
   when(io.apb.PSEL && io.apb.PENABLE) {
     when(io.apb.PWRITE) {
       registerWrite(io.apb.PADDR)
@@ -74,23 +77,37 @@ class SPI(p: BaseParams) extends Module {
     }
   }
 
+  // Signal Control
+  io.master.mosi := spiTransmit(0)
+  io.apb.PREADY := (io.apb.PENABLE && io.apb.PSEL)
+  io.master.cs := (stateReg === idle)
+  io.apb.PSLVERR := 0.U
+
+  // Error Handling
+  when((writeData) && (stateReg === normalMaster)) {
+    regs.INTFLAGS := regs.INTFLAGS | (1.U << 6.U) // Write Collision
+  }
+
   // Buffer should be able to be written to during a transmission
 
   switch(stateReg) {
-    is(IDLE) {
-      printf("IDLE\n")
+    is(idle) {
+      printf("idle\n")
       shiftCounter := 0.U
       when(regs.CTRLA(5) === 1.U) {
-        sclkReg := !((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
-        when((writeData) && (regs.CTRLB(6) === 0.U)) {
+        sclkReg := !((regs
+          .CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
+        when(
+          (writeData) && (regs.CTRLB(6) === 0.U) && (regs.CTRLA(0) === 1.U)
+        ) { // In Normal Mode, when the DATA register is written to and SPI is enabled
           writeData := false.B
-          stateReg := MASTER
+          stateReg := normalMaster
         }.otherwise {
-          stateReg := IDLE
+          stateReg := idle
         }
       }
     }
-    is(MASTER) {
+    is(normalMaster) {
       when((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U)) { // Sample on Rising Edge
         when(~prevClk & sclkReg) {
           when(shiftCounter < (p.dataWidth).U) {
@@ -101,9 +118,9 @@ class SPI(p: BaseParams) extends Module {
             }
             printf("TRANSMIT: %x\n", spiTransmit(0))
             shiftCounter := shiftCounter + 1.U
-            stateReg := MASTER
+            stateReg := normalMaster
           }.otherwise {
-            stateReg := IDLE
+            stateReg := idle
           }
         }
       }.otherwise {
@@ -116,21 +133,13 @@ class SPI(p: BaseParams) extends Module {
             }
             printf("TRANSMIT: %x\n", spiTransmit(0))
             shiftCounter := shiftCounter + 1.U
-            stateReg := MASTER
+            stateReg := normalMaster
           }.otherwise {
-            stateReg := IDLE
+            stateReg := idle
           }
         }
       }
     }
-  }
-  io.master.mosi := spiTransmit(0)
-  io.apb.PREADY := (io.apb.PENABLE && io.apb.PSEL)
-  io.master.cs := (stateReg === IDLE)
-  when(io.apb.PSEL && io.apb.PENABLE && (stateReg === MASTER)) {
-    io.apb.PSLVERR := 1.U
-  }.otherwise {
-    io.apb.PSLVERR := 0.U
   }
 
   def registerWrite(addr: UInt): Unit = {
@@ -228,6 +237,9 @@ class SPI(p: BaseParams) extends Module {
         addr
       )
       io.apb.PRDATA := regs.INTFLAGS
+      when(regs.INTFLAGS(6) === 1.U) {
+        regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 6.U) // Clear error flag once read
+      }
     }
     when(addr >= regs.DATA_ADDR.U && addr <= regs.DATA_ADDR_MAX.U) {
       printf("Reading DATA Register, data: %x, addr: %x\n", regs.DATA, addr)
