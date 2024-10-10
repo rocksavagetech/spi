@@ -9,7 +9,7 @@ class SPIRegs(p: BaseParams) extends Bundle {
   val CTRLB_SIZE: Int = p.regWidth
   val INTCTRL_SIZE: Int = p.regWidth
   val INTFLAGS_SIZE: Int = p.regWidth
-  val DATA_SIZE: Int = p.regWidth
+  val DATA_SIZE: Int = p.dataWidth
 
   // #####################################################################
   // REGS
@@ -21,6 +21,7 @@ class SPIRegs(p: BaseParams) extends Bundle {
   val DATA = RegInit(0.U(DATA_SIZE.W))
   // #####################################################################
 
+  // Should always be 8
   val CTRLA_ADDR: Int = 0
   val CTRLA_REG_SIZE: Int = (CTRLA_SIZE + REG_SIZE - 1) / REG_SIZE
   val CTRLA_ADDR_MAX: Int = CTRLA_ADDR + CTRLA_REG_SIZE - 1
@@ -36,7 +37,9 @@ class SPIRegs(p: BaseParams) extends Bundle {
   val INTFLAGS_ADDR: Int = INTCTRL_ADDR_MAX + 1
   val INTFLAGS_REG_SIZE: Int = (INTFLAGS_SIZE + REG_SIZE - 1) / REG_SIZE
   val INTFLAGS_ADDR_MAX: Int = INTFLAGS_ADDR + INTFLAGS_REG_SIZE - 1
+  //
 
+  // Can be 8, 16, 32
   val DATA_ADDR: Int = INTFLAGS_ADDR_MAX + 1
   val DATA_REG_SIZE: Int = (DATA_SIZE + REG_SIZE - 1) / REG_SIZE
   val DATA_ADDR_MAX: Int = DATA_ADDR + DATA_REG_SIZE - 1

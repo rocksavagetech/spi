@@ -15,3 +15,17 @@ class ApbInterface(p: BaseParams) extends Bundle {
   val PREADY = Output(Bool()) // Ready signal
   val PSLVERR = Output(Bool()) // Slave error signal
 }
+
+class MasterInterface() extends Bundle {
+  val miso = Input(Bool())
+  val mosi = Output(UInt(1.W))
+  val sclk = Output(Bool())
+  val cs = Output(Bool())
+}
+
+class SlaveInterface() extends Bundle {
+  val miso = Output(Bool())
+  val mosi = Input(UInt(1.W))
+  val sclk = Input(Bool())
+  val cs = Input(Bool())
+}
