@@ -17,19 +17,13 @@ class SPI(p: BaseParams) extends Module {
   val spiShift = RegInit(0.U(p.dataWidth.W))
   val shiftCounter = RegInit(0.U((log2Ceil(p.dataWidth) + 1).W))
 
-  // Flags
+  // Internal Flags
   val writeData = RegInit(false.B)
-  val readData = RegInit(false.B)
 
   // Transmit and Recieve Buffer
-  val transmitBuffer = RegInit(VecInit(Seq.fill(2)(0.U(p.dataWidth.W))))
-  val transmitIndex = RegInit(0.U(2.W))
-
-  val recieveBuffer = RegInit(VecInit(Seq.fill(2)(0.U(p.dataWidth.W))))
-  val recieveIndex = RegInit(0.U(2.W))
-  val recieveReg = RegInit(
-    0.U(p.dataWidth.W)
-  ) // Recieve has one reg buffer even in Normal Mode
+  val transmitBuffer = RegInit(0.U(p.dataWidth.W)) 
+  val recieveBuffer = RegInit(0.U(p.dataWidth.W)) 
+  val recieveReg = RegInit(0.U(p.dataWidth.W)) // Recieve has one reg buffer even in Normal Mode
 
   // Master Clock generation
   val sclkReg = RegInit(false.B)
@@ -57,7 +51,7 @@ class SPI(p: BaseParams) extends Module {
       sclkCounter := sclkCounter + 1.U
     }
     io.master.sclk := sclkReg
-  }.otherwise { // Temporary to pass build
+  }.otherwise { // Temporary to pass build w/o slave mode
     io.master.sclk := 0.U
   }
   io.slave.miso := 0.U
@@ -84,22 +78,16 @@ class SPI(p: BaseParams) extends Module {
   io.apb.PREADY := (io.apb.PENABLE && io.apb.PSEL)
   io.master.cs := (stateReg === idle)
   io.apb.PSLVERR := 0.U
-  when (transmitIndex === 1.U) {
-    regs.INTFLAGS := regs.INTFLAGS | (1.U << 6.U)   //Set Transfer Complete when we finish buffer
-  }
 
   // Error Handling
-  when((writeData) && (stateReg === masterMode) && (regs.CTRLB(7) === 0.U)) { //In Normal Mode
-    regs.INTFLAGS := regs.INTFLAGS | (1.U << 6.U) // Write Collision
-  }
-
-  when((writeData) && (stateReg === masterMode) && (regs.CTRLB(7) === 1.U) && (regs.CTRLB(5) === 1.U)) { //In Buffer Mode, when the Transmit Data Buffer is ready to recieve new data
-    writeData := 0.U
-    transmitBuffer
+  when((writeData) && (stateReg === masterMode)) {
+    when(regs.CTRLB(7) === 0.U) { // In Normal Mode
+      regs.INTFLAGS := regs.INTFLAGS | (1.U << 6.U) // Write Collision
+    }
+    //More error handling?
   }
 
   // Notes:
-  // Buffer should be able to be written to during a transmission
   // Need to fix cs functionality
   // Need to implement slave functionality
 
@@ -107,12 +95,13 @@ class SPI(p: BaseParams) extends Module {
     is(idle) {
       printf("idle\n")
       shiftCounter := 0.U
-      transmitIndex := 0.U
-      recieveIndex := 0.U
       when(regs.CTRLA(5) === 1.U) {
-        sclkReg := !((regs
-          .CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
+        sclkReg := !((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
         when((writeData) && (regs.CTRLA(0) === 1.U)) { // When the DATA register is written to and SPI is enabled
+          when(regs.CTRLB(7) === 1.U) {
+            spiShift := transmitBuffer
+            regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) //Buffer can be overriden now
+          }
           writeData := false.B
           stateReg := masterMode
         }.otherwise {
@@ -133,10 +122,10 @@ class SPI(p: BaseParams) extends Module {
             shiftCounter := shiftCounter + 1.U
             stateReg := masterMode
           }.otherwise {
-            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(6) === 0.U) { // In Buffer mode, when transmit buffer still has data
+            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
-              spiShift := transmitBuffer(transmitIndex)
-              transmitIndex := transmitIndex + 1.U
+              spiShift := transmitBuffer
+              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U)   //Unlock buffer
               stateReg := masterMode
             }.otherwise {
               stateReg := complete
@@ -155,10 +144,10 @@ class SPI(p: BaseParams) extends Module {
             shiftCounter := shiftCounter + 1.U
             stateReg := masterMode
           }.otherwise {
-            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(6) === 0.U) { // In Buffer mode, when transmit buffer still has data
+            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
-              spiShift := transmitBuffer(transmitIndex)
-              transmitIndex := transmitIndex + 1.U
+              spiShift := transmitBuffer
+              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U)   //Unlock buffer
               stateReg := masterMode
             }.otherwise {
               stateReg := complete
@@ -169,6 +158,12 @@ class SPI(p: BaseParams) extends Module {
     }
     is(complete) {
       recieveReg := spiShift
+      when(regs.CTRLB(7) === 1.U) {  // In Buffer Mode
+        recieveBuffer := recieveReg  //Buffer will hold older data from recieveReg 
+        when(regs.INTCTRL(6) === 1.U) { //When Tx Interrupts are enabled
+          regs.INTFLAGS := regs.INTFLAGS | (1.U << 6.U) //Set Tx Done Interrupt
+        }
+      }
       when(regs.CTRLB(7) === 0.U && regs.INTCTRL(0) === 1.U) { // In Normal mode, when interrupts are enabled
         regs.INTFLAGS := regs.INTFLAGS | (1.U << 7.U) // Set it
       }
@@ -230,7 +225,7 @@ class SPI(p: BaseParams) extends Module {
       ) * 8.U)) // Writing a 1 will clear the interrupt status
     }
     when((addr >= regs.DATA_ADDR.U && addr <= regs.DATA_ADDR_MAX.U)) {
-      when(regs.CTRLB(7) === 0.U && !(stateReg === masterMode)) {  // Can't write during normal transmission
+      when(regs.CTRLB(7) === 0.U && !(stateReg === masterMode)) { // Can't write during normal transmission
         printf(
           "Writing spiShift Register, data: %x, addr: %x\n",
           io.apb.PWDATA,
@@ -240,21 +235,16 @@ class SPI(p: BaseParams) extends Module {
         val shiftAddr = (addr - regs.DATA_ADDR.U)
         spiShift := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(regs.DATA_REG_SIZE - 1, 0) * 8.U))
       }
-      when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { //In buffer mode, when buffer has space
+      when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In buffer mode, when buffer has space
         printf(
-          "Writing transmitBuffer, data: %x, index: %x, addr: %x\n",
+          "Writing transmitBuffer, data: %x, addr: %x\n",
           io.apb.PWDATA,
-          transmitIndex,
           addr
         )
         writeData := true.B
         val shiftAddr = (addr - regs.DATA_ADDR.U)
-        transmitBuffer(transmitIndex) := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(regs.DATA_REG_SIZE - 1, 0) * 8.U))
-        transmitIndex := transmitIndex + 1.U
-        when (transmitIndex === 1.U) {  //Not sure the best way to deal with buffer writing
-          transmitIndex := 0.U
-
-        }
+        transmitBuffer := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(regs.DATA_REG_SIZE - 1, 0) * 8.U))
+        regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) //Lock Buffer
       }
     }
   }
@@ -290,8 +280,14 @@ class SPI(p: BaseParams) extends Module {
     }
     when(addr >= regs.DATA_ADDR.U && addr <= regs.DATA_ADDR_MAX.U) {
       printf("Reading DATA Register, data: %x, addr: %x\n", recieveReg, addr)
-      io.apb.PRDATA := recieveReg
-      readData := true.B
+      when(regs.CTRLB(7) === 0.U) {
+        io.apb.PRDATA := recieveReg
+     }
+     when(regs.CTRLB(7) === 1.U) {
+      io.apb.PRDATA := recieveBuffer
+      recieveBuffer := recieveReg
+      //when(regs.INTCTRL(7)) Implement recieve buffer empty and overflow interrupt
+     }
     }
   }
 
