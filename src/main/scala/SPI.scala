@@ -21,14 +21,27 @@ class SPI(p: BaseParams) extends Module {
   val writeData = RegInit(false.B)
 
   // Transmit and Recieve Buffer
-  val transmitBuffer = RegInit(0.U(p.dataWidth.W)) 
-  val recieveBuffer = RegInit(0.U(p.dataWidth.W)) 
-  val recieveReg = RegInit(0.U(p.dataWidth.W)) // Recieve has one reg buffer even in Normal Mode
+  val transmitBuffer = RegInit(0.U(p.dataWidth.W))
+  val recieveBuffer = RegInit(0.U(p.dataWidth.W))
+  val recieveReg = RegInit(
+    0.U(p.dataWidth.W)
+  ) // Recieve has one reg buffer even in Normal Mode
 
-  // Master Clock generation
+  // State Machine Initialization
+  object State extends ChiselEnum {
+    val idle, masterMode, slaveMode, complete = Value
+  }
+  import State._
+  val stateReg = RegInit(idle)
+
+  // Master Clock Generation & MOSI Control
   val sclkReg = RegInit(false.B)
   val prevClk = RegInit(false.B)
-  when(regs.CTRLA(5) === 1.U) { // Master mode Enabled
+  when(regs.CTRLA(5) === 1.U) { // Master Mode Enabled.
+    io.master.mosi := spiShift(0)
+    io.master.cs := (stateReg === idle)
+    io.slave.miso := 0.U // MISO Off in Master Mode
+
     val sclkCounter = RegInit(0.U(8.W))
     val prescalerMap: Map[UInt, UInt] = Map(
       0.U -> 4.U(8.W),
@@ -51,19 +64,14 @@ class SPI(p: BaseParams) extends Module {
       sclkCounter := sclkCounter + 1.U
     }
     io.master.sclk := sclkReg
-  }.otherwise { // Temporary to pass build w/o slave mode
-    io.master.sclk := 0.U
+  }.otherwise {
+    io.master.sclk := 0.U // Master clk off in slave mode
+    io.master.mosi := 0.U // MOSI off in slave Mode
+    io.master.cs := 0.U // Master CS off in slave mode
+    io.slave.miso := spiShift(0)
   }
-  io.slave.miso := 0.U
 
-  // State Machine Initialization
-  object State extends ChiselEnum {
-    val idle, masterMode, slaveMode, complete = Value
-  }
-  import State._
-  val stateReg = RegInit(idle)
   io.apb.PRDATA := 0.U
-
   // Control Register Read/Write
   when(io.apb.PSEL && io.apb.PENABLE) {
     when(io.apb.PWRITE) {
@@ -73,37 +81,55 @@ class SPI(p: BaseParams) extends Module {
     }
   }
 
-  // Signal Control
-  io.master.mosi := spiShift(0)
+  // APB Signal Control
   io.apb.PREADY := (io.apb.PENABLE && io.apb.PSEL)
-  io.master.cs := (stateReg === idle)
-  io.apb.PSLVERR := 0.U
+  // Handle invalid address case
+  when(
+    (io.apb.PADDR < regs.CTRLA_ADDR.U) || (io.apb.PADDR > regs.DATA_ADDR_MAX.U)
+  ) {
+    io.apb.PSLVERR := true.B // Set error signal
+  }.otherwise {
+    io.apb.PSLVERR := false.B // Clear error signal if valid
+  }
 
   // Error Handling
   when((writeData) && (stateReg === masterMode)) {
     when(regs.CTRLB(7) === 0.U) { // In Normal Mode
       regs.INTFLAGS := regs.INTFLAGS | (1.U << 6.U) // Write Collision
     }
-    //More error handling?
+    // More error handling?
   }
 
   // Notes:
-  // Need to fix cs functionality
-  // Need to implement slave functionality
+  // Implement wait for recieve buffer functionality
+  // Might need to fix master.cs functionality
+  // Might need to clear buffers/regs when switching between master and slave
 
   switch(stateReg) {
     is(idle) {
       printf("idle\n")
       shiftCounter := 0.U
-      when(regs.CTRLA(5) === 1.U) {
-        sclkReg := !((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
+      when(regs.CTRLA(5) === 1.U) { // Master Mode
+        sclkReg := !((regs
+          .CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
         when((writeData) && (regs.CTRLA(0) === 1.U)) { // When the DATA register is written to and SPI is enabled
           when(regs.CTRLB(7) === 1.U) {
             spiShift := transmitBuffer
-            regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) //Buffer can be overriden now
+            regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Buffer can be overriden now
           }
           writeData := false.B
           stateReg := masterMode
+        }.otherwise {
+          stateReg := idle
+        }
+      }.otherwise { // Slave Mode
+        when(~io.slave.cs && (regs.CTRLA(0) === 1.U)) { // When slave is selected and SPI is enabled
+          when(regs.CTRLB(7) === 1.U) {
+            spiShift := transmitBuffer
+            regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Buffer can be overriden now
+          }
+          writeData := false.B
+          stateReg := slaveMode
         }.otherwise {
           stateReg := idle
         }
@@ -125,7 +151,7 @@ class SPI(p: BaseParams) extends Module {
             when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
               spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U)   //Unlock buffer
+              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Unlock buffer
               stateReg := masterMode
             }.otherwise {
               stateReg := complete
@@ -147,8 +173,60 @@ class SPI(p: BaseParams) extends Module {
             when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
               spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U)   //Unlock buffer
+              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Unlock buffer
               stateReg := masterMode
+            }.otherwise {
+              stateReg := complete
+            }
+          }
+        }
+      }
+    }
+    is(slaveMode) {
+      prevClk := io.slave.sclk
+      when((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U)) { // Sample on Rising Edge
+        when(~prevClk & io.slave.sclk) {
+          when(shiftCounter < (p.dataWidth).U) {
+            when(regs.CTRLA(6) === 1.U) {
+              spiShift := io.slave.mosi ## spiShift(p.dataWidth - 1, 1)
+            }.otherwise {
+              spiShift := spiShift(p.dataWidth - 1, 1) ## io.slave.mosi
+            }
+            printf("TRANSMIT: %x\n", spiShift(0))
+            shiftCounter := shiftCounter + 1.U
+            stateReg := Mux(
+              io.slave.cs,
+              idle,
+              slaveMode
+            ) // When cs goes high, abondon all transmissions and go back to idle
+          }.otherwise {
+            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U) { // In Buffer mode, when transmit buffer still has data
+              shiftCounter := 0.U
+              spiShift := transmitBuffer
+              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Unlock buffer
+              stateReg := Mux(io.slave.cs, idle, slaveMode)
+            }.otherwise {
+              stateReg := complete
+            }
+          }
+        }
+      }.otherwise {
+        when(prevClk & ~io.slave.sclk) { // Sample on Falling Edge
+          when(shiftCounter < (p.dataWidth).U) {
+            when(regs.CTRLA(6) === 1.U) {
+              spiShift := io.slave.mosi ## spiShift(p.dataWidth - 1, 1)
+            }.otherwise {
+              spiShift := spiShift(p.dataWidth - 1, 1) ## io.slave.mosi
+            }
+            printf("TRANSMIT: %x\n", spiShift(0))
+            shiftCounter := shiftCounter + 1.U
+            stateReg := Mux(io.slave.cs, idle, slaveMode)
+          }.otherwise {
+            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U) { // In Buffer mode, when transmit buffer still has data
+              shiftCounter := 0.U
+              spiShift := transmitBuffer
+              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Unlock buffer
+              stateReg := Mux(io.slave.cs, idle, slaveMode)
             }.otherwise {
               stateReg := complete
             }
@@ -158,10 +236,10 @@ class SPI(p: BaseParams) extends Module {
     }
     is(complete) {
       recieveReg := spiShift
-      when(regs.CTRLB(7) === 1.U) {  // In Buffer Mode
-        recieveBuffer := recieveReg  //Buffer will hold older data from recieveReg 
-        when(regs.INTCTRL(6) === 1.U) { //When Tx Interrupts are enabled
-          regs.INTFLAGS := regs.INTFLAGS | (1.U << 6.U) //Set Tx Done Interrupt
+      when(regs.CTRLB(7) === 1.U) { // In Buffer Mode
+        recieveBuffer := recieveReg // Buffer will hold older data from recieveReg
+        when(regs.INTCTRL(6) === 1.U) { // When Tx Interrupts are enabled
+          regs.INTFLAGS := regs.INTFLAGS | (1.U << 6.U) // Set Tx Done Interrupt
         }
       }
       when(regs.CTRLB(7) === 0.U && regs.INTCTRL(0) === 1.U) { // In Normal mode, when interrupts are enabled
@@ -233,7 +311,10 @@ class SPI(p: BaseParams) extends Module {
         )
         writeData := true.B
         val shiftAddr = (addr - regs.DATA_ADDR.U)
-        spiShift := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(regs.DATA_REG_SIZE - 1, 0) * 8.U))
+        spiShift := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(
+          regs.DATA_REG_SIZE - 1,
+          0
+        ) * 8.U))
       }
       when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In buffer mode, when buffer has space
         printf(
@@ -243,8 +324,11 @@ class SPI(p: BaseParams) extends Module {
         )
         writeData := true.B
         val shiftAddr = (addr - regs.DATA_ADDR.U)
-        transmitBuffer := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(regs.DATA_REG_SIZE - 1, 0) * 8.U))
-        regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) //Lock Buffer
+        transmitBuffer := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(
+          regs.DATA_REG_SIZE - 1,
+          0
+        ) * 8.U))
+        regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Lock Buffer
       }
     }
   }
@@ -282,12 +366,12 @@ class SPI(p: BaseParams) extends Module {
       printf("Reading DATA Register, data: %x, addr: %x\n", recieveReg, addr)
       when(regs.CTRLB(7) === 0.U) {
         io.apb.PRDATA := recieveReg
-     }
-     when(regs.CTRLB(7) === 1.U) {
-      io.apb.PRDATA := recieveBuffer
-      recieveBuffer := recieveReg
-      //when(regs.INTCTRL(7)) Implement recieve buffer empty and overflow interrupt
-     }
+      }
+      when(regs.CTRLB(7) === 1.U) {
+        io.apb.PRDATA := recieveBuffer
+        recieveBuffer := recieveReg
+        // when(regs.INTCTRL(7)) Implement recieve buffer empty and overflow interrupt
+      }
     }
   }
 
