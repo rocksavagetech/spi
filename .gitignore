@@ -30,7 +30,7 @@ bin/
 *.iws
 .idea
 
-# mac
+# MacOS
 .DS_Store
 
 # other?
@@ -45,4 +45,15 @@ bin/
 out
 generated
 *.anno.json
+build.properties
 test_run_dir
+
+# LaTeX
+*.aux
+*.toc
+*.out
+*.log
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.pdf
