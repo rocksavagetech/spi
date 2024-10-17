@@ -29,3 +29,9 @@ class SlaveInterface() extends Bundle {
   val sclk = Input(Bool())
   val cs = Input(Bool())
 }
+
+class SPIInterface(p: BaseParams) extends Bundle {
+  val apb = new ApbInterface(p)
+  val master = new MasterInterface
+  val slave = new SlaveInterface
+}

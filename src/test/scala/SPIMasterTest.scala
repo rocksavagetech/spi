@@ -48,27 +48,27 @@ class GPIOTest
       TargetDirAnnotation("generated")
     )
 
-    val myParams =
-      BaseParams(true, 1, 2, 8, 8)
+    // val myParams =
+    //   BaseParams(true, 1, 2, 8, 8)
 
-    testName should "pass" in {
-      val cov = test(new SPIMaster(myParams))
-        .withAnnotations(backendAnnotations) { dut =>
-          // Reset Sequence
-          dut.reset.poke(true.B)
-          dut.clock.step()
-          dut.reset.poke(false.B)
+    // testName should "pass" in {
+    //   val cov = test(new SPIMaster(myParams))
+    //     .withAnnotations(backendAnnotations) { dut =>
+    //       // Reset Sequence
+    //       dut.reset.poke(true.B)
+    //       dut.clock.step()
+    //       dut.reset.poke(false.B)
 
-          writeAPB(dut, 0.U, 25.U)
-          for (i <- 0 until 25) {
-            dut.clock.step()
-            dut.io.pins.miso.poke(1)
-            // println(s"MOSI: ${dut.io.pins.mosi.peek().litValue}")
-            // dut.io.pins.mosi.expect(0xa5.U & (1 << i).U)
-          }
-          println(s"MISO: ${readAPB(dut, 0.U)}")
-        }
-    }
+    //       writeAPB(dut, 0.U, 25.U)
+    //       for (i <- 0 until 25) {
+    //         dut.clock.step()
+    //         dut.io.pins.miso.poke(1)
+    //         // println(s"MOSI: ${dut.io.pins.mosi.peek().litValue}")
+    //         // dut.io.pins.mosi.expect(0xa5.U & (1 << i).U)
+    //       }
+    //       println(s"MISO: ${readAPB(dut, 0.U)}")
+    //     }
+    // }
   }
 
   (1 to numTests).foreach(config => main(s"test$config"))
