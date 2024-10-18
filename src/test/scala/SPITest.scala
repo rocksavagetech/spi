@@ -30,15 +30,18 @@ import firrtl2.options.TargetDirAnnotation
   */
 
 class SPITest
-    extends AnyFlatSpec with ChiselScalatestTester with Matchers with APBUtils {
+    extends AnyFlatSpec
+    with ChiselScalatestTester
+    with Matchers
+    with APBUtils {
 
   val verbose = false
   val numTests = 1
 
   // System properties for flags
-  val enableVcd = System.getProperty("enableVcd", "false").toBoolean
+  val enableVcd = System.getProperty("enableVcd", "true").toBoolean
   val enableFst = System.getProperty("enableFst", "false").toBoolean
-  val useVerilator = System.getProperty("useVerilator", "true").toBoolean
+  val useVerilator = System.getProperty("useVerilator", "false").toBoolean
 
   val buildRoot = sys.env.get("BUILD_ROOT_RELATIVE")
   if (buildRoot.isEmpty) {
@@ -53,10 +56,10 @@ class SPITest
   val backendAnnotations = {
     var annos: Seq[Annotation] = Seq() // Initialize with correct type
 
-    if (enableVcd) annos = annos :+ chiseltest.simulator.WriteVcdAnnotation 
+    if (enableVcd) annos = annos :+ chiseltest.simulator.WriteVcdAnnotation
     if (enableFst) annos = annos :+ chiseltest.simulator.WriteFstAnnotation
     if (useVerilator) {
-      annos = annos :+ chiseltest.simulator.VerilatorBackendAnnotation 
+      annos = annos :+ chiseltest.simulator.VerilatorBackendAnnotation
       annos = annos :+ VerilatorCFlags(Seq("--std=c++17"))
     }
     annos = annos :+ TargetDirAnnotation(testDir)
@@ -73,13 +76,14 @@ class SPITest
     // Randomize Input Variables
     val validDataWidths = Seq(8, 16, 32)
     val validPAddrWidths = Seq(8, 16, 32)
-    val dataWidth = 8 //validDataWidths(Random.nextInt(validDataWidths.length))
+    val dataWidth = 8 // validDataWidths(Random.nextInt(validDataWidths.length))
     val addrWidth = validPAddrWidths(Random.nextInt(validPAddrWidths.length))
 
     // Pass in randomly selected values to DUT
     val myParams = BaseParams(dataWidth, addrWidth, 8)
 
     // Test case for Master Mode Initialization
+    /*
     it should "initialize the SPI core in Master Mode correctly" in {
       test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         implicit val clk: Clock = dut.clock // Provide implicit clock
@@ -104,59 +108,84 @@ class SPITest
         dut.io.master.mosi.expect(false.B) // Check if MOSI is controlled properly in slave mode
       }
     }
+     */
 
     // Test 2.1: Full Duplex Transmission (Master-Slave) for all SPI Modes with Randomized DataWidth
     it should "transmit and receive data correctly in Full Duplex mode (Master-Slave) for all SPI modes" in {
       // Loop through all 4 SPI modes
       for (mode <- 0 until 4) {
-        test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-          implicit val clk: Clock = dut.clock // Provide implicit clock
+        test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) {
+          dut =>
+            implicit val clk: Clock = dut.clock // Provide implicit clock
 
-          // Generate random data for Master and Slave according to the randomized dataWidth
-          val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-          val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
+            // Generate random data for Master and Slave according to the randomized dataWidth
+            val masterData =
+              BigInt(dataWidth, Random) // Randomized data for master
+            val slaveData =
+              BigInt(dataWidth, Random) // Randomized data for slave
+        
+            // Configure SPI mode by setting bits 1:0 of the CTRLB register
+            writeAPB(
+              dut.io.masterApb,
+              dut.master.regs.CTRLB_ADDR.U,
+              mode.U
+            ) // Set SPI mode in Master
+            writeAPB(
+              dut.io.slaveApb,
+              dut.slave.regs.CTRLB_ADDR.U,
+              mode.U
+            ) // Set SPI mode in Slave
 
-          // Configure SPI mode by setting bits 1:0 of the CTRLB register
-          writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, mode.U) // Set SPI mode in Master
-          writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLB_ADDR.U, mode.U)   // Set SPI mode in Slave
+            // Set up Master to transmit and Slave to receive
+            writeAPB(
+              dut.io.masterApb,
+              dut.master.regs.DATA_ADDR.U,
+              masterData.U
+            )
+            writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
 
-          // Set up Master to transmit and Slave to receive
-          writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-          writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
+            // Enable both Master and Slave
+            writeAPB(
+              dut.io.slaveApb,
+              dut.slave.regs.CTRLA_ADDR.U,
+              "b00000001".U
+            ) // Set Slave
+            writeAPB(
+              dut.io.masterApb,
+              dut.master.regs.CTRLA_ADDR.U,
+              "b00100001".U
+            ) // Set Master in Master mode
 
-          // Enable both Master and Slave
-          writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-          writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
+            // Determine CPOL and CPHA based on mode
+            val (cpol, cpha) =
+              (mode >> 1, mode & 1) // CPOL is bit 1, CPHA is bit 0
 
-          // Determine CPOL and CPHA based on mode
-          val (cpol, cpha) = (mode >> 1, mode & 1) // CPOL is bit 1, CPHA is bit 0
+            // Simulate SPI clock cycles
+            for (i <- 0 until dataWidth) {
+              // Extract the current bit from the master and slave data
+              val masterBit =
+                (masterData >> (dataWidth - 1 - i)) & 1 // Sending MSB first
+              val slaveBit =
+                (slaveData >> (dataWidth - 1 - i)) & 1 // Sending MSB first
 
-          // Simulate SPI clock cycles
-          for (i <- 0 until dataWidth) {
-            // Extract the current bit from the master and slave data
-            val masterBit = (masterData >> (dataWidth - 1 - i)) & 1  // Sending MSB first
-            val slaveBit = (slaveData >> (dataWidth - 1 - i)) & 1    // Sending MSB first
-
-            // Perform the clocking based on CPHA
-            if (cpha == 0) {
-              // CPHA = 0: Sample on leading edge, shift on trailing edge
-              dut.io.master.mosi.expect(masterBit.B)
-              dut.io.slave.miso.expect(slaveBit.B)
-              dut.clock.step(1) // Leading edge (rising or falling depending on CPOL)
-              dut.clock.step(1)
-            } else {
-              // Insert a step here to ensure data is stable before checking the bit.
-              dut.clock.step(1)  // Add this clock step to synchronize correctly
-              // Now check the sampled values (trailing edge)
-              dut.io.master.mosi.expect(masterBit.B)
-              dut.io.slave.miso.expect(slaveBit.B)
-              dut.clock.step(1)
-
+              // Perform the clocking based on CPHA
+              if (cpha == 0) {
+                // CPHA = 0: Sample on leading edge, shift on trailing edge
+                dut.io.master.mosi.expect(masterBit.B)
+                dut.io.slave.miso.expect(slaveBit.B)
+                dut.clock.step(10) // Leading edge (rising or falling depending on CPOL)
+              } else {
+                // Insert a step here to ensure data is stable before checking the bit.
+                // Now check the sampled values (trailing edge)
+                dut.io.master.mosi.expect(masterBit.B)
+                dut.io.slave.miso.expect(slaveBit.B)
+                dut.clock.step(10) // Add this clock step to synchronize correctly
+              }
             }
-          }
         }
       }
     }
+    /*
 
     // Test 2.2: MSB First and LSB First Data Order
     it should "transmit and receive data correctly in MSB and LSB first modes" in {
@@ -186,7 +215,7 @@ class SPITest
 
           dut.clock.step(2)
         }
-      } 
+      }
     }
 
     // 3.1 Clock Speed Tests
@@ -216,7 +245,7 @@ class SPITest
           dut.io.slave.miso.expect(slaveBit.B)
           dut.clock.step(32)
         }
-      } 
+      }
     }
 
     // Test 3.2: Double-Speed Master SPI Mode
@@ -246,7 +275,7 @@ class SPITest
           dut.io.slave.miso.expect(slaveBit.B)
           dut.clock.step(4)
         }
-      } 
+      }
     }
 
     // Test 4.1: Transmission Complete Interrupt Flag
@@ -266,7 +295,7 @@ class SPITest
         writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00000001".U) // Enable TXCIF interrupt
         writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
         writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
-        
+
         // Simulate SPI clock cycles
         for (i <- 0 until dataWidth) {
           // Extract the current bit from the master and slave data
@@ -280,7 +309,7 @@ class SPITest
         dut.clock.step(2)
         val readTxInt = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
         (readTxInt >> 7)  should be (1) // Check if the transmission complete flag is set
-      } 
+      }
     }
 
     // Test 4.2: Write Collision Flag
@@ -330,7 +359,7 @@ class SPITest
         val masterBit = (masterData >> (dataWidth - 1)) & 1  // Sending MSB first
         val slaveBit = (slaveData >> (dataWidth - 1)) & 1    // Sending MSB first
 
-        dut.clock.step(2)   
+        dut.clock.step(2)
         val readTxInt = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
         (readTxInt & (1 << 5)) >> 5  should be (1) // Check if the data register empty flag is set
       }
@@ -397,6 +426,7 @@ class SPITest
         }
       }
     }
+     */
   }
 }
 

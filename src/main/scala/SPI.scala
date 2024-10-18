@@ -5,7 +5,7 @@ import chisel3.util._
 
 class SPI(p: BaseParams) extends Module {
   val io = IO(new SPIInterface(p))
-  
+
   // Control Registers
   val regs = new SPIRegs(p)
 
@@ -35,34 +35,17 @@ class SPI(p: BaseParams) extends Module {
   val prevClk = RegInit(false.B)
   val sclkCounter = RegInit(0.U(8.W))
   when(regs.CTRLA(5) === 1.U) { // Master Mode Enabled.
-    when (regs.CTRLA(6) === 0.U){
+    when(regs.CTRLA(6) === 0.U) {
       io.master.mosi := spiShift(p.dataWidth - 1)
-    }.otherwise{
+    }.otherwise {
       io.master.mosi := spiShift(0)
     }
-    io.master.cs := (stateReg === idle)
+    io.master.cs := ~(stateReg === masterMode)
     io.slave.miso := 0.U // MISO Off in Master Mode
 
-    val baseValue = 4.U
-    val powerValue = regs.CTRLA(2, 1)  // Assuming this is the power you want to raise to
-    val prescalerValue = RegInit(1.U(32.W))    // Initialize the prescalerValue register
-    
-    val counter = RegInit(0.U(8.W))    // Counter to keep track of the loop
-    val maxIterations = powerValue     // The loop should run powerValue times
-    
-    // Loop to multiply the prescalerValue by baseValue 'powerValue' times
-    when(counter < maxIterations) {
-      prescalerValue := prescalerValue * baseValue     // Multiply the prescalerValue by the base value
-      counter := counter + 1.U         // Increment the counter
-    }
-    val clk2xValue =  Mux(
-              regs.CTRLA(4) === 1.U,
-              2.U,
-              1.U)   
-
-    val toggleThreshold = (prescalerValue / clk2xValue) - 1.U
-
-    when(sclkCounter === toggleThreshold) {
+    when(
+      sclkCounter === ((4.U << (regs.CTRLA(2, 1) * 2.U)) >> (regs.CTRLA(4)))
+    ) {
       prevClk := sclkReg
       sclkReg := ~sclkReg
       sclkCounter := 0.U
@@ -74,9 +57,9 @@ class SPI(p: BaseParams) extends Module {
     io.master.sclk := 0.U // Master clk off in slave mode
     io.master.mosi := 0.U // MOSI off in slave Mode
     io.master.cs := 0.U // Master CS off in slave mode
-    when(regs.CTRLA(6) === 0.U){
+    when(regs.CTRLA(6) === 0.U) {
       io.slave.miso := spiShift(p.dataWidth - 1)
-    }.otherwise{
+    }.otherwise {
       io.slave.miso := spiShift(0)
     }
   }
@@ -116,7 +99,7 @@ class SPI(p: BaseParams) extends Module {
 
   switch(stateReg) {
     is(idle) {
-      printf("idle\n")
+      //printf("idle\n")
       shiftCounter := 0.U
       when(regs.CTRLA(5) === 1.U) { // Master Mode
         sclkReg := !((regs
@@ -146,7 +129,7 @@ class SPI(p: BaseParams) extends Module {
     }
     is(masterMode) {
       when((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U)) { // Sample on Rising Edge
-        when(~prevClk & sclkReg & sclkCounter === 0.U) {
+        when(~prevClk & io.master.sclk & sclkCounter === 0.U) {
           when(shiftCounter < (p.dataWidth).U) {
             when(regs.CTRLA(6) === 1.U) {
               spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
@@ -158,7 +141,11 @@ class SPI(p: BaseParams) extends Module {
             shiftCounter := shiftCounter + 1.U
             stateReg := masterMode
           }.otherwise {
-            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U & regs.INTCTRL(5) === 1.U) { // In Buffer mode, when transmit buffer still has data
+            when(
+              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U & regs.INTCTRL(
+                5
+              ) === 1.U
+            ) { // In Buffer mode, when transmit buffer still has data
               printf("Buffer Mode\n")
               shiftCounter := 0.U
               spiShift := transmitBuffer
@@ -171,7 +158,7 @@ class SPI(p: BaseParams) extends Module {
           }
         }
       }.otherwise {
-        when(prevClk & ~sclkReg & sclkCounter === 0.U) { // Sample on Falling Edge
+        when(prevClk & ~io.master.sclk & sclkCounter === 0.U) { // Sample on Falling Edge
           when(shiftCounter < (p.dataWidth).U) {
             when(regs.CTRLA(6) === 1.U) {
               spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
@@ -183,7 +170,11 @@ class SPI(p: BaseParams) extends Module {
             shiftCounter := shiftCounter + 1.U
             stateReg := masterMode
           }.otherwise {
-            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U  & regs.INTCTRL(5) === 1.U) { // In Buffer mode, when transmit buffer still has data
+            when(
+              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U & regs.INTCTRL(
+                5
+              ) === 1.U
+            ) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
               spiShift := transmitBuffer
               regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Unlock buffer
@@ -215,7 +206,11 @@ class SPI(p: BaseParams) extends Module {
               slaveMode
             ) // When cs goes high, abondon all transmissions and go back to idle
           }.otherwise {
-            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U  & regs.INTCTRL(5) === 1.U) { // In Buffer mode, when transmit buffer still has data
+            when(
+              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U & regs.INTCTRL(
+                5
+              ) === 1.U
+            ) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
               spiShift := transmitBuffer
               regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Unlock buffer
@@ -276,11 +271,7 @@ class SPI(p: BaseParams) extends Module {
         io.apb.PWDATA,
         addr
       )
-      val shiftAddr = (addr - regs.CTRLA_ADDR.U)
-      regs.CTRLA := (io.apb.PWDATA(regs.CTRLA_SIZE - 1, 0) << (shiftAddr(
-        regs.CTRLA_REG_SIZE - 1,
-        0
-      ) * 8.U))
+      regs.CTRLA := io.apb.PWDATA
     }
     when(addr >= regs.CTRLB_ADDR.U && addr <= regs.CTRLB_ADDR_MAX.U) {
       printf(
@@ -288,11 +279,7 @@ class SPI(p: BaseParams) extends Module {
         io.apb.PWDATA,
         addr
       )
-      val shiftAddr = (addr - regs.CTRLB_ADDR.U)
-      regs.CTRLB := (io.apb.PWDATA(regs.CTRLB_SIZE - 1, 0) << (shiftAddr(
-        regs.CTRLB_REG_SIZE - 1,
-        0
-      ) * 8.U))
+      regs.CTRLB := io.apb.PWDATA
     }
     when(addr >= regs.INTCTRL_ADDR.U && addr <= regs.INTCTRL_ADDR_MAX.U) {
       printf(
@@ -300,11 +287,7 @@ class SPI(p: BaseParams) extends Module {
         io.apb.PWDATA,
         addr
       )
-      val shiftAddr = (addr - regs.INTCTRL_ADDR.U)
-      regs.INTCTRL := (io.apb.PWDATA(regs.INTCTRL_SIZE - 1, 0) << (shiftAddr(
-        regs.INTCTRL_REG_SIZE - 1,
-        0
-      ) * 8.U))
+      regs.INTCTRL := io.apb.PWDATA
     }
     when(addr >= regs.INTFLAGS_ADDR.U && addr <= regs.INTFLAGS_ADDR_MAX.U) {
       printf(
@@ -313,13 +296,7 @@ class SPI(p: BaseParams) extends Module {
         addr
       )
       val shiftAddr = (addr - regs.INTFLAGS_ADDR.U)
-      regs.INTFLAGS := regs.INTFLAGS & ~(io.apb.PWDATA(
-        regs.INTFLAGS_SIZE - 1,
-        0
-      ) << (shiftAddr(
-        regs.INTFLAGS_REG_SIZE - 1,
-        0
-      ) * 8.U)) // Writing a 1 will clear the interrupt status
+      regs.INTFLAGS := regs.INTFLAGS & ~io.apb.PWDATA
     }
     when((addr >= regs.DATA_ADDR.U && addr <= regs.DATA_ADDR_MAX.U)) {
       writeData := true.B
