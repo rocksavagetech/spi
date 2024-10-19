@@ -81,7 +81,7 @@ class SPITest
 
     // Pass in randomly selected values to DUT
     val myParams = BaseParams(dataWidth, addrWidth, 8)
-/*
+
     // Test case for Master Mode Initialization
     it should "initialize the SPI core in Master Mode correctly" in {
       test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
@@ -108,11 +108,10 @@ class SPITest
       }
     }
      
-*/
     // Test 2.1: Full Duplex Transmission (Master-Slave) for all SPI Modes with Randomized DataWidth
     it should "transmit and receive data correctly in Full Duplex mode (Master-Slave) for all SPI modes" in {
       // Loop through all 4 SPI modes
-      for (mode <- 3 until 4) {
+      for (mode <- 0 until 4) {
         test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) {
           dut =>
             implicit val clk: Clock = dut.clock // Provide implicit clock
@@ -185,7 +184,7 @@ class SPITest
       }
     }
     
-    /*
+    
 
     // Test 2.2: MSB First and LSB First Data Order
     it should "transmit and receive data correctly in MSB and LSB first modes" in {
@@ -438,7 +437,7 @@ class SPITest
         }
       }
     }
-    */
+    
      
   }
 }
