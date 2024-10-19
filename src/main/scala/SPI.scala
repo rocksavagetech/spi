@@ -44,7 +44,7 @@ class SPI(p: BaseParams) extends Module {
     io.slave.miso := 0.U // MISO Off in Master Mode
 
     when(
-      sclkCounter === ((4.U << (regs.CTRLA(2, 1) * 2.U)) >> (regs.CTRLA(4)))
+      sclkCounter === (((2.U << (regs.CTRLA(2, 1) * 2.U)) >> (regs.CTRLA(4))) - 1.U)
     ) {
       prevClk := sclkReg
       sclkReg := ~sclkReg
@@ -105,9 +105,9 @@ class SPI(p: BaseParams) extends Module {
         sclkReg := !((regs
           .CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
         when((writeData) && (regs.CTRLA(0) === 1.U)) { // When the DATA register is written to and SPI is enabled
-          when(regs.CTRLB(7) === 1.U & regs.INTCTRL(5) === 1.U) { // In Buffer mode, when buffer has space
+          when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In Buffer mode, when buffer has data
             spiShift := transmitBuffer
-            regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Buffer can be overriden now
+            regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Buffer can be overriden now
           }
           writeData := false.B
           stateReg := masterMode
@@ -116,7 +116,7 @@ class SPI(p: BaseParams) extends Module {
         }
       }.otherwise { // Slave Mode
         when(~io.slave.cs && (regs.CTRLA(0) === 1.U)) { // When slave is selected and SPI is enabled
-          when(regs.CTRLB(7) === 1.U & regs.INTCTRL(5) === 1.U) {
+          when(regs.CTRLB(7) === 1.U) {
             spiShift := transmitBuffer
             regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Buffer can be overriden now
           }
@@ -135,23 +135,20 @@ class SPI(p: BaseParams) extends Module {
               spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
               printf("MASTER TRANSMIT: %x\n", spiShift(0))
             }.otherwise {
-              spiShift := spiShift(p.dataWidth - 2, 0) ## io.master.miso
+              spiShift := spiShift(p.dataWidth - 1, 0) ## io.master.miso
               printf("MASTER TRANSMIT: %x\n", spiShift(p.dataWidth - 1))
             }
             shiftCounter := shiftCounter + 1.U
             stateReg := masterMode
           }.otherwise {
             when(
-              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U & regs.INTCTRL(
-                5
-              ) === 1.U
+              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U
             ) { // In Buffer mode, when transmit buffer still has data
               printf("Buffer Mode\n")
               shiftCounter := 0.U
               spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Unlock buffer
+              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U)  // Unlock buffer
               stateReg := masterMode
-              writeData := false.B
             }.otherwise {
               stateReg := complete
             }
@@ -164,22 +161,19 @@ class SPI(p: BaseParams) extends Module {
               spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
               printf("MASTER TRANSMIT: %x\n", spiShift(0))
             }.otherwise {
-              spiShift := spiShift(p.dataWidth - 2, 0) ## io.master.miso
+              spiShift := spiShift(p.dataWidth - 1, 0) ## io.master.miso
               printf("MASTER TRANSMIT: %x\n", spiShift(p.dataWidth - 1))
             }
             shiftCounter := shiftCounter + 1.U
             stateReg := masterMode
           }.otherwise {
             when(
-              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U & regs.INTCTRL(
-                5
-              ) === 1.U
+              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U
             ) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
               spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Unlock buffer
+              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
               stateReg := masterMode
-              writeData := false.B
             }.otherwise {
               stateReg := complete
             }
@@ -196,7 +190,7 @@ class SPI(p: BaseParams) extends Module {
               spiShift := io.slave.mosi ## spiShift(p.dataWidth - 1, 1)
               printf("SLAVE TRANSMIT: %x\n", spiShift(0))
             }.otherwise {
-              spiShift := spiShift(p.dataWidth - 2, 0) ## io.slave.mosi
+              spiShift := spiShift(p.dataWidth - 1, 0) ## io.slave.mosi
               printf("SLAVE TRANSMIT: %x\n", spiShift(p.dataWidth - 1))
             }
             shiftCounter := shiftCounter + 1.U
@@ -207,15 +201,12 @@ class SPI(p: BaseParams) extends Module {
             ) // When cs goes high, abondon all transmissions and go back to idle
           }.otherwise {
             when(
-              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U & regs.INTCTRL(
-                5
-              ) === 1.U
+              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U
             ) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
               spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Unlock buffer
+              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U)  // Unlock buffer
               stateReg := Mux(io.slave.cs, idle, slaveMode)
-              writeData := false.B
             }.otherwise {
               stateReg := complete
             }
@@ -228,18 +219,17 @@ class SPI(p: BaseParams) extends Module {
               spiShift := io.slave.mosi ## spiShift(p.dataWidth - 1, 1)
               printf("SLAVE TRANSMIT: %x\n", spiShift(0))
             }.otherwise {
-              spiShift := spiShift(p.dataWidth - 2, 0) ## io.slave.mosi
+              spiShift := spiShift(p.dataWidth - 1, 0) ## io.slave.mosi
               printf("SLAVE TRANSMIT: %x\n", spiShift(p.dataWidth - 1))
             }
             shiftCounter := shiftCounter + 1.U
             stateReg := Mux(io.slave.cs, idle, slaveMode)
           }.otherwise {
-            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U) { // In Buffer mode, when transmit buffer still has data
+            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
               spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Unlock buffer
+              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U)  // Unlock buffer
               stateReg := Mux(io.slave.cs, idle, slaveMode)
-              writeData := false.B
             }.otherwise {
               stateReg := complete
             }
@@ -312,10 +302,7 @@ class SPI(p: BaseParams) extends Module {
           0
         ) * 8.U))
       }
-      when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U) { // Buffer is full
-        regs.INTFLAGS := regs.INTFLAGS | (1.U) // Buffer can be overriden now
-      }
-      when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In buffer mode, when buffer has space
+      when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 0.U) { // In buffer mode, when buffer has space
         printf(
           "Writing transmitBuffer, data: %x, addr: %x\n",
           io.apb.PWDATA,
@@ -327,7 +314,7 @@ class SPI(p: BaseParams) extends Module {
           regs.DATA_REG_SIZE - 1,
           0
         ) * 8.U))
-        regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Lock Buffer
+        regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Lock Buffer
       }
     }
   }
