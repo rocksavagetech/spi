@@ -44,9 +44,10 @@ class SPI(p: BaseParams) extends Module {
     io.slave.miso := 0.U // MISO Off in Master Mode
 
     when(
-      sclkCounter === (((2.U << (regs.CTRLA(2, 1) * 2.U)) >> (regs.CTRLA(4))) - 1.U)
+      sclkCounter === (((2.U << (regs.CTRLA(2, 1) * 2.U)) >> (regs.CTRLA(
+        4
+      ))) - 1.U)
     ) {
-      prevClk := sclkReg
       sclkReg := ~sclkReg
       sclkCounter := 0.U
     }.otherwise {
@@ -99,10 +100,11 @@ class SPI(p: BaseParams) extends Module {
 
   switch(stateReg) {
     is(idle) {
-      //printf("idle\n")
+      // printf("idle\n")
       shiftCounter := 0.U
       when(regs.CTRLA(5) === 1.U) { // Master Mode
-        sclkReg := !((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U))
+        sclkReg := !((regs
+          .CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U))
         when((writeData) && (regs.CTRLA(0) === 1.U)) { // When the DATA register is written to and SPI is enabled
           when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In Buffer mode, when buffer has data
             spiShift := transmitBuffer
@@ -127,8 +129,9 @@ class SPI(p: BaseParams) extends Module {
       }
     }
     is(masterMode) {
+      prevClk := sclkReg
       when((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U)) { // Sample on Rising Edge
-        when(~prevClk & io.master.sclk & sclkCounter === 0.U) {
+        when(~prevClk & io.master.sclk) {
           when(shiftCounter < (p.dataWidth).U) {
             when(regs.CTRLA(6) === 1.U) {
               spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
@@ -146,7 +149,7 @@ class SPI(p: BaseParams) extends Module {
               printf("Buffer Mode\n")
               shiftCounter := 0.U
               spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U)  // Unlock buffer
+              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
               stateReg := masterMode
             }.otherwise {
               stateReg := complete
@@ -154,7 +157,7 @@ class SPI(p: BaseParams) extends Module {
           }
         }
       }.otherwise {
-        when(prevClk & ~io.master.sclk & sclkCounter === 0.U) { // Sample on Falling Edge
+        when(prevClk & ~io.master.sclk) { // Sample on Falling Edge
           when(shiftCounter < (p.dataWidth).U) {
             when(regs.CTRLA(6) === 1.U) {
               spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
@@ -183,7 +186,7 @@ class SPI(p: BaseParams) extends Module {
     is(slaveMode) {
       prevClk := io.slave.sclk
       when((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U)) { // Sample on Rising Edge
-        when(~prevClk & io.slave.sclk & sclkCounter === 0.U) {
+        when(~prevClk & io.slave.sclk) {
           when(shiftCounter < (p.dataWidth).U) {
             when(regs.CTRLA(6) === 1.U) {
               spiShift := io.slave.mosi ## spiShift(p.dataWidth - 1, 1)
@@ -204,7 +207,7 @@ class SPI(p: BaseParams) extends Module {
             ) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
               spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U)  // Unlock buffer
+              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
               stateReg := Mux(io.slave.cs, idle, slaveMode)
             }.otherwise {
               stateReg := complete
@@ -212,7 +215,7 @@ class SPI(p: BaseParams) extends Module {
           }
         }
       }.otherwise {
-        when(prevClk & ~io.slave.sclk & sclkCounter === 0.U) { // Sample on Falling Edge
+        when(prevClk & ~io.slave.sclk) { // Sample on Falling Edge
           when(shiftCounter < (p.dataWidth).U) {
             when(regs.CTRLA(6) === 1.U) {
               spiShift := io.slave.mosi ## spiShift(p.dataWidth - 1, 1)
@@ -227,7 +230,7 @@ class SPI(p: BaseParams) extends Module {
             when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In Buffer mode, when transmit buffer still has data
               shiftCounter := 0.U
               spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U)  // Unlock buffer
+              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
               stateReg := Mux(io.slave.cs, idle, slaveMode)
             }.otherwise {
               stateReg := complete
