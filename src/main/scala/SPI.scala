@@ -150,6 +150,7 @@ class SPI(p: BaseParams) extends Module {
               shiftCounter := 0.U
               spiShift := transmitBuffer
               regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
+              writeData := false.B
               stateReg := masterMode
             }.otherwise {
               stateReg := complete
@@ -175,6 +176,7 @@ class SPI(p: BaseParams) extends Module {
               shiftCounter := 0.U
               spiShift := transmitBuffer
               regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
+              writeData := false.B
               stateReg := masterMode
             }.otherwise {
               stateReg := complete
@@ -208,6 +210,7 @@ class SPI(p: BaseParams) extends Module {
               shiftCounter := 0.U
               spiShift := transmitBuffer
               regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
+              writeData := false.B
               stateReg := Mux(io.slave.cs, idle, slaveMode)
             }.otherwise {
               stateReg := complete
@@ -231,6 +234,7 @@ class SPI(p: BaseParams) extends Module {
               shiftCounter := 0.U
               spiShift := transmitBuffer
               regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
+              writeData := false.B
               stateReg := Mux(io.slave.cs, idle, slaveMode)
             }.otherwise {
               stateReg := complete
