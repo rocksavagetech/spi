@@ -4,7 +4,11 @@ import chisel3._
 import chisel3.util._
 
 class SPI(p: BaseParams) extends Module {
-  val io = IO(new SPIInterface(p))
+  val io = IO(new Bundle {
+    val apb = new ApbInterface(p)
+    val master = new MasterInterface
+    val slave = new SlaveInterface
+  })
 
   // Control Registers
   val regs = new SPIRegs(p)
@@ -104,7 +108,7 @@ class SPI(p: BaseParams) extends Module {
       shiftCounter := 0.U
       when(regs.CTRLA(5) === 1.U) { // Master Mode
         sclkReg := !((regs
-          .CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U))
+          .CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
         when((writeData) && (regs.CTRLA(0) === 1.U)) { // When the DATA register is written to and SPI is enabled
           when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In Buffer mode, when buffer has data
             spiShift := transmitBuffer
@@ -137,7 +141,7 @@ class SPI(p: BaseParams) extends Module {
               spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
               printf("MASTER TRANSMIT: %x\n", spiShift(0))
             }.otherwise {
-              spiShift := spiShift(p.dataWidth - 1, 0) ## io.master.miso
+              spiShift := spiShift(p.dataWidth - 2, 0) ## io.master.miso
               printf("MASTER TRANSMIT: %x\n", spiShift(p.dataWidth - 1))
             }
             shiftCounter := shiftCounter + 1.U
@@ -164,7 +168,7 @@ class SPI(p: BaseParams) extends Module {
               spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
               printf("MASTER TRANSMIT: %x\n", spiShift(0))
             }.otherwise {
-              spiShift := spiShift(p.dataWidth - 1, 0) ## io.master.miso
+              spiShift := spiShift(p.dataWidth - 2, 0) ## io.master.miso
               printf("MASTER TRANSMIT: %x\n", spiShift(p.dataWidth - 1))
             }
             shiftCounter := shiftCounter + 1.U
@@ -194,7 +198,7 @@ class SPI(p: BaseParams) extends Module {
               spiShift := io.slave.mosi ## spiShift(p.dataWidth - 1, 1)
               printf("SLAVE TRANSMIT: %x\n", spiShift(0))
             }.otherwise {
-              spiShift := spiShift(p.dataWidth - 1, 0) ## io.slave.mosi
+              spiShift := spiShift(p.dataWidth - 2, 0) ## io.slave.mosi
               printf("SLAVE TRANSMIT: %x\n", spiShift(p.dataWidth - 1))
             }
             shiftCounter := shiftCounter + 1.U
@@ -224,7 +228,7 @@ class SPI(p: BaseParams) extends Module {
               spiShift := io.slave.mosi ## spiShift(p.dataWidth - 1, 1)
               printf("SLAVE TRANSMIT: %x\n", spiShift(0))
             }.otherwise {
-              spiShift := spiShift(p.dataWidth - 1, 0) ## io.slave.mosi
+              spiShift := spiShift(p.dataWidth - 2, 0) ## io.slave.mosi
               printf("SLAVE TRANSMIT: %x\n", spiShift(p.dataWidth - 1))
             }
             shiftCounter := shiftCounter + 1.U
