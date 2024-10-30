@@ -8,6 +8,7 @@ class SPI(p: BaseParams) extends Module {
     val apb = new ApbInterface(p)
     val master = new MasterInterface
     val slave = new SlaveInterface
+    val spiShiftOut = Output(UInt(p.dataWidth.W))
   })
 
   // Control Registers
@@ -15,6 +16,7 @@ class SPI(p: BaseParams) extends Module {
 
   // Shift Register
   val spiShift = RegInit(0.U(p.dataWidth.W))
+  io.spiShiftOut := spiShift
   val shiftCounter = RegInit(0.U((log2Ceil(p.dataWidth) + 1).W))
 
   // Internal Flags

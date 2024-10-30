@@ -15,7 +15,9 @@ class DaisyChainSPI(p: BaseParams) extends Module {
 
     // Expose the master and slave SPI interfaces for Full Duplex operation
     val master = new MasterInterface
-    val slave = new SlaveInterface
+    val slave1 = new SlaveInterface
+    val slave2 = new SlaveInterface
+    val slave3 = new SlaveInterface
   })
 
 // Instantiate the SPI master and slaves
@@ -33,9 +35,9 @@ class DaisyChainSPI(p: BaseParams) extends Module {
   slave3.io.apb <> io.slave3Apb
 
   master.io.master <> io.master // Master drives SCLK, MOSI, and CS
-  slave1.io.slave <> io.slave // Slave drives MISO
-  slave2.io.slave <> io.slave // Slave drives MISO
-  slave3.io.slave <> io.slave // Slave drives MISO
+  slave1.io.slave <> io.slave1 // Slave drives MISO
+  slave2.io.slave <> io.slave2 // Slave drives MISO
+  slave3.io.slave <> io.slave3 // Slave drives MISO
 
 // Connect the SPI signals for daisy chaining
 // Master to Slave 1
