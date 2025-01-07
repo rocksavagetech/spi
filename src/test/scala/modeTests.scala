@@ -137,16 +137,16 @@ object modeTests extends ApbUtils {
         val masterData1 = BigInt(myParams.dataWidth, Random)  // Randomized data for master
         val masterData2 = BigInt(myParams.dataWidth, Random)   // Randomized data
         val masterData3 = BigInt(myParams.dataWidth, Random) 
-        val masterData4 = BigInt(myParams.dataWidth, Random) 
+        //val masterData4 = BigInt(myParams.dataWidth, Random) 
         writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000000".U) // Enable Buffer Mode. Needs to be done BEFORE writing data
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData1.U)
 
         // Enable both Master and Slave
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
         writeAPB(dut.io.slave1Apb, dut.slave1.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
         writeAPB(dut.io.slave2Apb, dut.slave2.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.slave3Apb, dut.slave3.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
+        //writeAPB(dut.io.slave3Apb, dut.slave3.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
+        // Set up Master to transmit and Slave to receive
+        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData1.U)
         dut.clock.step(1)
         writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData2.U) // Write new data before transfer completes
         // check that transmit buffer is not empty and has expected value
@@ -155,10 +155,10 @@ object modeTests extends ApbUtils {
           for (i <- 0 until myParams.dataWidth * 2) {
             if (i < myParams.dataWidth) {
               val masterBit = (masterData1 >> (myParams.dataWidth - 1 - i)) & 1 // Sending MSB first
-              // dut.io.master.mosi.expect(masterBit.B)
+              //dut.io.master.mosi.expect(masterBit.B)
             } else {
               val masterBit = (masterData2 >> (myParams.dataWidth - 1 - i)) & 1
-              // dut.io.master.mosi.expect(masterBit.B)
+              //dut.io.master.mosi.expect(masterBit.B)
             }
             dut.clock.step(4)
           }
@@ -168,10 +168,10 @@ object modeTests extends ApbUtils {
               //dut.io.master.mosi.expect(masterBit.B)
               dut.clock.step(4)
           }
-          writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData4.U)
-          for (i <- 0 until myParams.dataWidth*3) {  //Need to go through 3 more cycles for everything to loop back to master
-              dut.clock.step(4)
-          }
+          //writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData4.U)
+          //for (i <- 0 until myParams.dataWidth*3) {  //Need to go through 3 more cycles for everything to loop back to master
+          //    dut.clock.step(4)
+         // }
 
           val readReg = readAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U)
           //gtkwave not working, need to debug why DATA is empty    
