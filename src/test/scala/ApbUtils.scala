@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import chiseltest._
 
-trait APBUtils {
+trait ApbUtils {
   def writeAPB(apb: ApbInterface, addr: UInt, data: UInt)(implicit clock: Clock): Unit = {
     // Set up for writing to the specified APB address
     apb.PSEL.poke(1.U)           // Select APB slave

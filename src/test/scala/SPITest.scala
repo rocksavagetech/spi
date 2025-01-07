@@ -29,18 +29,20 @@ import firrtl2.options.TargetDirAnnotation
   * code coverage for all top-level ports. Inspired by the DynamicFifo
   */
 
-class SPITest
+class GpioTest
     extends AnyFlatSpec
     with ChiselScalatestTester
     with Matchers
-    with APBUtils {
+    with ApbUtils {
 
   val verbose = false
-  val numTests = 1
+  val numTests = 2
+  val testName = System.getProperty("testName")
+  println(s"Argument passed: $testName")
 
   // System properties for flags
-  val enableVcd = System.getProperty("enableVcd", "true").toBoolean
-  val enableFst = System.getProperty("enableFst", "false").toBoolean
+  val enableVcd = System.getProperty("enableVcd", "false").toBoolean
+  val enableFst = System.getProperty("enableFst", "true").toBoolean
   val useVerilator = System.getProperty("useVerilator", "false").toBoolean
 
   val buildRoot = sys.env.get("BUILD_ROOT_RELATIVE")
@@ -50,7 +52,9 @@ class SPITest
   }
   val testDir = buildRoot.get + "/test"
 
-  println(s"VCD: $enableVcd, FST: $enableFst, Verilator: $useVerilator")
+  println(
+    s"Test: $testName, VCD: $enableVcd, FST: $enableFst, Verilator: $useVerilator"
+  )
 
   // Constructing the backend annotations based on the flags
   val backendAnnotations = {
@@ -67,11 +71,16 @@ class SPITest
     annos
   }
 
-  // Add regression across a randomized range of configurations
-  main()
+  // Execute the regressigiyon across a randomized range of configurations
+  if (testName == "regression") (1 to numTests).foreach { config => 
+    main(s"GPIO_test_config_$config")
+  }
+  else {
+    main(testName)
+  }
 
-  def main(): Unit = {
-    behavior of "spi module"
+  def main(testName: String): Unit = {
+    behavior of testName
 
     // Randomize Input Variables
     val validDataWidths = Seq(8, 16, 32)
@@ -82,493 +91,327 @@ class SPITest
     // Pass in randomly selected values to DUT
     val myParams = BaseParams(dataWidth, addrWidth, 8)
 
-    
-    // Test case for Master Mode Initialization
+      info(s"Data Width = $dataWidth")
+      info(s"Address Width = $addrWidth")
+      info("--------------------------------")
+
+    testName match {
+        // Test case for Master Mode Initialization
+        case "masterMode" =>
+            it should "initialize the SPI core in Master Mode correctly" in {
+            val cov = test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                transmitTests.masterMode(dut, myParams)
+            }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
+        // Test case for Slave Mode Initialization
+        case "slaveMode" =>
+            it should "initialize the SPI core in Slave Mode correctly" in {
+                val cov = test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                transmitTests.slaveMode(dut, myParams)
+            }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)                  
+            }
+
+        // Test 2.1: Full Duplex Transmission (Master-Slave) for all SPI Modes with Randomized DataWidth
+        case "fullDuplex" =>
+            it should "transmit and receive data correctly in Full Duplex mode (Master-Slave) for all SPI modes" in {
+            val cov =  test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                transmitTests.fullDuplex(dut, myParams)
+            }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)                
+            }
+
+        // Test 2.2: MSB First and LSB First Data Order
+        case "bitOrder" =>
+            it should "transmit and receive data correctly in MSB and LSB first modes" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                transmitTests.bitOrder(dut, myParams)
+            }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
+        case "transmitTests" =>
+            transmitTestsFull(myParams)
+
+        // 3.1 Clock Speed Tests
+        case "prescaler" =>
+            it should "clock speed test for prescalar 0x2(64 times slower)" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                clockTests.prescaler(dut, myParams)
+                }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
+        // Test 3.2: Double-Speed Master SPI Mode
+        case "doubleSpeed" =>
+            it should "clock speed for clk2x with prescalar of 8 times slower" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                clockTests.doubleSpeed(dut, myParams)
+                }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
+        case "clockTests" =>
+            clockTestsFull(myParams)
+
+        // Test 4.1: Transmission Complete Interrupt Flag
+        case "txComplete" =>
+            it should "transmission complete interrupt flag" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                interruptTests.txComplete(dut, myParams)
+                }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
+        // Test 4.2: Write Collision Flag
+        case "wcolFLag" =>
+            it should "write collision flag" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                interruptTests.wcolFlag(dut, myParams)
+                }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+        
+        // Test 4.3: Data Register Empty Interrupt
+        case "dataEmpty" =>
+            it should "data register empty interrupt flag" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                interruptTests.dataEmpty(dut, myParams)
+                }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
+        case "interruptTests" =>
+            interruptTestsFull(myParams)
+
+        // Test 7.2: Buffered Mode Master
+        // Enable Buffered Mode and check that multiple bytes can be written to the transmit buffer before the transfer completes.
+        // Verify that received data is stored in the FIFO correctly.
+        case "bufferTx" =>
+            it should "buffered mode master" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                modeTests.bufferTx(dut, myParams)
+                }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
+        // Test 7.3: Recieve Register Check Normal Mode
+        case "normalRx" =>
+            it should "recieve register correct normal mode" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                modeTests.normalRx(dut, myParams)
+                }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
+        // Test 7.4: Recieve Register Check Buffer Mode Mode
+        case "bufferRx" =>
+            it should "recieve register correct buffer" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                modeTests.bufferRx(dut, myParams)
+                }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
+        //Test 8.1: Daisy Chain Test with 3 Slaves
+        case "daisyChain" =>
+            it should "daisy chain correctly" in {
+            val cov = test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                modeTests.daisyChain(dut, myParams)
+            }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+        
+        case "modeTests" =>
+            modeTestsFull(myParams)
+
+        case "allTests" =>
+            allTests(myParams)
+
+        case _ => allTests(myParams)
+        }
+
+      // Test 6.1: Master Deactivation upon SS Low
+      // In a multi-master scenario, configure the SS pin to control master activation.
+      // Drive SS low and ensure the SPI automatically switches from Master to Slave mode.
+
+      // Test 6.2: Tri-state MISO in Slave Mode
+      // In Slave mode, configure the MISO pin as output.
+      // When SS is high, ensure MISO is tri-stated (disconnected).
+      // When SS is low, verify that MISO outputs data correctly.
+
+      // Test 7.3: Normal Mode Slave
+      // In Slave mode, ensure the SPI logic halts when SS is high and resumes when SS is low.
+
+      // Test 7.4: Buffered Mode Slave
+      // Enable Buffered Mode in Slave mode and verify that multiple received bytes are stored in the FIFO and transmitted correctly.
+
+        it should "generate cumulative coverage report" in {
+        coverageCollector.saveCumulativeCoverage(myParams)
+        }
+    }
+
+
+      
+    //}
+
+  def allTests(
+      myParams: BaseParams
+  ): Unit = {
+    transmitTestsFull(myParams)
+    clockTestsFull(myParams)
+    interruptTestsFull(myParams)
+    modeTestsFull(myParams)
+  }
+
+  def transmitTestsFull(
+      myParams: BaseParams
+  ): Unit = {
+
     it should "initialize the SPI core in Master Mode correctly" in {
-      test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-        // Set SPI to Master Mode by writing to CTRLA register
-        writeAPB(dut.io.apb, dut.regs.CTRLA_ADDR.U, "b00100001".U) // Set MASTER bit, Set ENABLE bit
-
-        readAPB(dut.io.apb, dut.regs.CTRLA_ADDR.U) should be (33) // Check CTRLA is set correctly
-        dut.io.master.cs.expect(true.B) // Assert CS line (Active low)
-      }
+    val cov = test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        transmitTests.masterMode(dut, myParams)
+    }
+    coverageCollection(cov.getAnnotationSeq, myParams, "masterMode")
     }
 
-    // // Test case for Slave Mode Initialization
     it should "initialize the SPI core in Slave Mode correctly" in {
-      test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-        // Set SPI to Slave Mode by writing to CTRLA register
-        writeAPB(dut.io.apb, dut.regs.CTRLA_ADDR.U, "b00000001".U) // Set ENABLE bit
-
-        readAPB(dut.io.apb, dut.regs.CTRLA_ADDR.U) should be (1) // Check CTRLA is set correctly for Slave mode
-        dut.io.slave.cs.expect(false.B) // initial conditions of SS line
-        dut.io.slave.miso.expect(false.B) // Check if MISO is controlled properly in slave mode
-        dut.io.master.mosi.expect(false.B) // Check if MOSI is controlled properly in slave mode
-      }
+        val cov = test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        transmitTests.slaveMode(dut, myParams)
+    }
+    coverageCollection(cov.getAnnotationSeq, myParams, "slaveMode")                  
     }
 
-    // Test 2.1: Full Duplex Transmission (Master-Slave) for all SPI Modes with Randomized DataWidth
     it should "transmit and receive data correctly in Full Duplex mode (Master-Slave) for all SPI modes" in {
-      // Define dataWidth as per your module's specification or randomize if needed
-      // Iterate over all 4 SPI modes (0 to 3)
-      for (mode <- 0 until 3) {
-        test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-          implicit val clk: Clock = dut.clock // Provide implicit clock
-
-          // Generate random data for Master and Slave
-          val masterData = BigInt(dataWidth, Random)
-          val slaveData = BigInt(dataWidth, Random)
-
-          // Configure SPI mode by setting bits 1:0 of the CTRLB register
-          writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, mode.U) // Set SPI mode in Master
-          writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLB_ADDR.U, mode.U)   // Set SPI mode in Slave
-
-          // Set up Master to transmit and Slave to receive
-          writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-          writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-          // Enable both Master and Slave
-          writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U)  // Enable Slave
-          writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Enable Master in Master mode
-
-          // Determine CPOL and CPHA based on mode
-          val (cpol, cpha) = ((mode >> 1) & 1, mode & 1)
-
-          // Fork Slave Reception Thread
-          val slaveThread = fork {
-            for (i <- 0 until dataWidth) {
-              // Extract the expected bit from the slave data
-              val expectedBit = (slaveData >> (dataWidth - 1 - i)) & 1
-              dut.io.slave.miso.expect(expectedBit) 
-              dut.clock.step(4)
-            }
-          }
-
-          // Fork Master Transmission Thread
-          val masterThread = fork {
-            for (i <- 0 until dataWidth) {
-              // Extract the current bit from the master data (MSB first)
-              val masterBit = (masterData >> (dataWidth - 1 - i)) & 1
-              dut.io.master.mosi.expect(masterBit.B)
-              dut.clock.step(4)
-            }
-          }
-
-          // Join Both Threads to ensure completion
-          masterThread.join()
-          slaveThread.join()
-
-          // Assertions to verify data transmission
-          val receivedMasterData = dut.io.spiShiftOutMaster.peek().litValue
-          val receivedSlaveData = dut.io.spiShiftOutSlave.peek().litValue
-
-          // Verify that the master received the slave's data
-          receivedMasterData should be (slaveData)
-
-          // Verify that the slave received the master's data
-          receivedSlaveData should be (masterData)
-        }
-      }
+    val cov =  test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        transmitTests.fullDuplex(dut, myParams)
+    }
+    coverageCollection(cov.getAnnotationSeq, myParams, "fullDuplex")                
     }
 
-    // Test 2.2: MSB First and LSB First Data Order
     it should "transmit and receive data correctly in MSB and LSB first modes" in {
-      test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-        val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
-
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-        // Enable both Master and Slave
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b01000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b01100001".U) // Set Master in Master mode
-
-        // Simulate SPI clock cycles
-        for (i <- 0 until dataWidth) {
-          // Extract the current bit from the master and slave data
-          val masterBit = ((masterData & (1 << i)) >> i) & 1 // sending LSB first
-          val slaveBit = ((slaveData & (1 << i)) >> i) & 1 // sending LSB first
-
-          dut.io.master.mosi.expect(masterBit.B)
-          dut.io.slave.miso.expect(slaveBit.B)
-
-          dut.clock.step(4)
-        }
-      }
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        transmitTests.bitOrder(dut, myParams)
+    }
+    coverageCollection(cov.getAnnotationSeq, myParams, "bitOrder")
     }
 
-    // 3.1 Clock Speed Tests
+  }
+  
+  def clockTestsFull(
+      myParams: BaseParams
+  ): Unit = {
+
     it should "clock speed test for prescalar 0x2(64 times slower)" in {
-      test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-        val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
-
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-        // Enable both Master and Slave
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100101".U) // Set Master in Master mode
-
-        // Simulate SPI clock cycles
-        for (i <- 0 until dataWidth) {
-          // Extract the current bit from the master and slave data
-          val masterBit = (masterData >> (dataWidth - 1 - i)) & 1  // Sending MSB first
-          val slaveBit = (slaveData >> (dataWidth - 1 - i)) & 1    // Sending MSB first
-
-          dut.io.master.mosi.expect(masterBit.B)
-          dut.io.slave.miso.expect(slaveBit.B)
-          dut.clock.step(64)
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        clockTests.prescaler(dut, myParams)
         }
-      }
+    coverageCollection(cov.getAnnotationSeq, myParams, "prescaler")
     }
 
-
-    // Test 3.2: Double-Speed Master SPI Mode
-    it should " clock speed for clk2x with prescalar of 8 times slower" in {
-      test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-        val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
-
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-        // Enable both Master and Slave
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00110011".U) // Set Master in Master mode
-
-        // Simulate SPI clock cycles
-        for (i <- 0 until dataWidth) {
-          // Extract the current bit from the master and slave data
-          val masterBit = (masterData >> (dataWidth - 1 - i)) & 1  // Sending MSB first
-          val slaveBit = (slaveData >> (dataWidth - 1 - i)) & 1    // Sending MSB first
-
-          dut.io.master.mosi.expect(masterBit.B)
-          dut.io.slave.miso.expect(slaveBit.B)
-          dut.clock.step(8)
+    it should "clock speed for clk2x with prescalar of 8 times slower" in {
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        clockTests.doubleSpeed(dut, myParams)
         }
-      }
+    coverageCollection(cov.getAnnotationSeq, myParams, "doubleSpeed")
     }
+  }
 
+  def interruptTestsFull(
+      myParams: BaseParams
+  ): Unit = {
 
-    // Test 4.1: Transmission Complete Interrupt Flag
     it should "transmission complete interrupt flag" in {
-      test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-        val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
-
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-        // Enable both Master and Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00000001".U) // Enable TXCIF interrupt
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
-
-        // Simulate SPI clock cycles
-        for (i <- 0 until dataWidth) {
-          // Extract the current bit from the master and slave data
-          val masterBit = (masterData >> (dataWidth - 1 - i)) & 1  // Sending MSB first
-          val slaveBit = (slaveData >> (dataWidth - 1 - i)) & 1    // Sending MSB first
-
-          dut.io.master.mosi.expect(masterBit.B)
-          dut.io.slave.miso.expect(slaveBit.B)
-          dut.clock.step(4)
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        interruptTests.txComplete(dut, myParams)
         }
-        dut.clock.step(2)
-        val readTxInt = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
-        (readTxInt >> 7)  should be (1) // Check if the transmission complete flag is set
-      }
+    coverageCollection(cov.getAnnotationSeq, myParams, "txComplete")
     }
 
-    // Test 4.2: Write Collision Flag
     it should "write collision flag" in {
-      test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-        val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
-
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-        // Enable both Master and Slave
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
-        writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00000001".U) // Enable TXCIF interrupt
-
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U) // Write new data before transfer completes
-        val readTxInt = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
-        (readTxInt & (1 << 6)) >> 6  should be (1) // Check if the write collision flag is set
-      }
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        interruptTests.wcolFlag(dut, myParams)
+        }
+    coverageCollection(cov.getAnnotationSeq, myParams, "wcolFLag")
     }
 
-    // Test 4.3: Data Register Empty Interrupt
     it should "data register empty interrupt flag" in {
-      test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-        val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
-
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-        // Enable both Master and Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000000".U) // Enable DREIF interrupt
-        //writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00100000".U) // Enable DREIF interrupt
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
-
-        // Extract the current bit from the master and slave data
-        val masterBit = (masterData >> (dataWidth - 1)) & 1  // Sending MSB first
-        val slaveBit = (slaveData >> (dataWidth - 1)) & 1    // Sending MSB first
-
-        dut.clock.step(2)
-        val readTxInt = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
-        (readTxInt & (1 << 5)) >> 5  should be (0) // Check if the data register empty flag is set. 0 is for empty now.
-      }
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        interruptTests.dataEmpty(dut, myParams)
+        }
+    coverageCollection(cov.getAnnotationSeq, myParams, "dataEmpty")
     }
+  }
 
-    // Test 5.1: Lost Data Due to Buffer Overflow
-    // In Buffer mode, ensure data is not lost if the receive FIFO is not read in time.
-    // Check that the appropriate error flag is set when data is lost.
-    // Not sure what you're trying to do here. Bit(0) is for recieve data buffer overflow
-    /*
-    it should "lost data due to buffer overflow" in {
-      test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-        val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
-
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-        // Enable both Master and Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000000".U) // Enable DREIF interrupt
-        //writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00100000".U) // Enable DREIF interrupt
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U) // Write new data before transfer completes
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U) // Write new data before transfer completes
-        val readTxInt = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
-        (readTxInt & (1))  should be (1) // Check if the write collision flag is set
-      }
-    }
-     */
-
-    // Test 7.2: Buffered Mode Master
-    // Enable Buffered Mode and check that multiple bytes can be written to the transmit buffer before the transfer completes.
-    // Verify that received data is stored in the FIFO correctly.
+  def modeTestsFull(
+      myParams: BaseParams
+  ): Unit = {
     it should "buffered mode master" in {
-      test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-        val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000000".U) // Enable Buffer Mode. Needs to be done BEFORE writing data
-
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-        // Enable both Master and Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00100000".U) // Enable DREIF interrupt
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
-        dut.clock.step(1)
-        val transmitBuffer = BigInt(dataWidth, Random)  // Randomized data for master
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, transmitBuffer.U) // Write new data before transfer completes
-        // check that transmit buffer is not empty and has expected value
-        //dut.clock.step(2*(dataWidth-1))
-
-        for (i <- 0 until dataWidth*2) {
-          if (i < dataWidth) {
-            val masterBit = (masterData >> (dataWidth - 1 - i)) & 1  // Sending MSB first
-            //dut.io.master.mosi.expect(masterBit.B)
-          } else {
-            val masterBit = (transmitBuffer >> (dataWidth - 1 - i)) & 1
-            //dut.io.master.mosi.expect(masterBit.B)
-          }
-            dut.clock.step(4)
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        modeTests.bufferTx(dut, myParams)
         }
-      }
+    coverageCollection(cov.getAnnotationSeq, myParams, "bufferTx")
     }
 
-
-    // Test x.1: Recieve Register Check Normal Mode
-    it should "recieve register correct" in {
-      test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-        val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
-
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-        writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00000001".U) //Enable transmit complete interrupt
-
-        // Enable both Master and Slave
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b01000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b01100001".U) // Set Master in Master mode
-
-        // Simulate SPI clock cycles
-        for (i <- 0 until dataWidth) {
-          // Extract the current bit from the master and slave data
-          val masterBit = ((masterData & (1 << i)) >> i) & 1 // sending LSB first
-          val slaveBit = ((slaveData & (1 << i)) >> i) & 1 // sending LSB first
-
-          dut.io.master.mosi.expect(masterBit.B)
-          dut.io.slave.miso.expect(slaveBit.B)
-
-          dut.clock.step(4)
+    it should "recieve register correct normal mode" in {
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        modeTests.normalRx(dut, myParams)
         }
-        val readReg = readAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U)
-        val readInt = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
-        require(readReg === slaveData)
-        require(readInt === 128)
-        writeAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U, "b10000000".U)  //Clear Interrupt
-        require(readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U) === 0)
-      }
+    coverageCollection(cov.getAnnotationSeq, myParams, "normalRx")
     }
 
-    // Test x.1: Recieve Register Check Buffer Mode Mode
     it should "recieve register correct buffer" in {
-       test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData = BigInt(dataWidth, Random)  // Randomized data for master
-        val slaveData = BigInt(dataWidth, Random)   // Randomized data for slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000000".U) // Enable Buffer Mode. Needs to be done BEFORE writing data
-
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
-        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
-        // Enable both Master and Slave
-        //writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00100000".U) // Enable DREIF interrupt
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
-        dut.clock.step(1)
-        val transmitBuffer = BigInt(dataWidth, Random)  // Randomized data for master
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, transmitBuffer.U) // Write new data before transfer completes
-        // check that transmit buffer is not empty and has expected value
-        //dut.clock.step(2*(dataWidth-1))
-
-          for (i <- 0 until dataWidth * 2) {
-            if (i < dataWidth) {
-              val masterBit =
-                (masterData >> (dataWidth - 1 - i)) & 1 // Sending MSB first
-              // dut.io.master.mosi.expect(masterBit.B)
-            } else {
-              val masterBit = (transmitBuffer >> (dataWidth - 1 - i)) & 1
-              // dut.io.master.mosi.expect(masterBit.B)
-            }
-            dut.clock.step(4)
-          }
-          val readReg = readAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U)
-          //gtkwave not working, need to debug why DATA is empty
-      }
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        modeTests.bufferRx(dut, myParams)
+        }
+    coverageCollection(cov.getAnnotationSeq, myParams, "bufferRx")
     }
-    
 
-    //Test 8.1: Daisy Chain Test with 3 Slaves
     it should "daisy chain correctly" in {
-       test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        implicit val clk: Clock = dut.clock // Provide implicit clock
-
-        // Generate random data for Master and Slave according to the randomized dataWidth
-        val masterData1 = BigInt(dataWidth, Random)  // Randomized data for master
-        val masterData2 = BigInt(dataWidth, Random)   // Randomized data
-        val masterData3 = BigInt(dataWidth, Random) 
-        val masterData4 = BigInt(dataWidth, Random) 
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000000".U) // Enable Buffer Mode. Needs to be done BEFORE writing data
-        // Set up Master to transmit and Slave to receive
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData1.U)
-
-        // Enable both Master and Slave
-        writeAPB(dut.io.slave1Apb, dut.slave1.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.slave2Apb, dut.slave2.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.slave3Apb, dut.slave3.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
-        dut.clock.step(1)
-        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData2.U) // Write new data before transfer completes
-        // check that transmit buffer is not empty and has expected value
-        //dut.clock.step(2*(dataWidth-1))
-
-          for (i <- 0 until dataWidth * 2) {
-            if (i < dataWidth) {
-              val masterBit = (masterData1 >> (dataWidth - 1 - i)) & 1 // Sending MSB first
-              // dut.io.master.mosi.expect(masterBit.B)
-            } else {
-              val masterBit = (masterData2 >> (dataWidth - 1 - i)) & 1
-              // dut.io.master.mosi.expect(masterBit.B)
-            }
-            dut.clock.step(4)
-          }
-          writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData3.U)
-          for (i <- 0 until dataWidth) {
-              val masterBit = (masterData3 >> (dataWidth - 1 - i)) & 1 // Sending MSB first
-              // dut.io.master.mosi.expect(masterBit.B)
-              dut.clock.step(4)
-          }
-          writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData4.U)
-          for (i <- 0 until dataWidth*3) {  //Need to go through 3 more cycles for everything to loop back to master
-              dut.clock.step(4)
-          }
-
-          val readReg = readAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U)
-          //gtkwave not working, need to debug why DATA is empty
-      }
+    val cov = test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        modeTests.daisyChain(dut, myParams)
     }
-    
+    coverageCollection(cov.getAnnotationSeq, myParams, "daisyChain")
+    }
+  }
+
+
+  def coverageCollection(
+    cov: Seq[Annotation],
+    myParams: BaseParams,
+    testName: String
+    ): Unit = {
+    if (myParams.coverage) {
+      val coverage = cov
+        .collectFirst { case a: TestCoverage => a.counts }
+        .get
+        .toMap
+
+      val testConfig =
+        myParams.addrWidth.toString + "_" + myParams.dataWidth.toString
+
+      val buildRoot = sys.env.get("BUILD_ROOT")
+      if (buildRoot.isEmpty) {
+        println("BUILD_ROOT not set, please set and run again")
+        System.exit(1)
+      }
+      // path join
+      val scalaCoverageDir = new File(buildRoot.get + "/cov/scala")
+      val verCoverageDir = new File(buildRoot.get + "/cov/verilog")
+      verCoverageDir.mkdirs()
+      val coverageFile = verCoverageDir.toString + "/" + testName + "_" +
+        testConfig + ".cov"
+
+      val stuckAtFault = checkCoverage(coverage, coverageFile)
+      if (stuckAtFault)
+        println(
+          s"WARNING: At least one IO port did not toggle -- see $coverageFile"
+        )
+      info(s"Verilog Coverage report written to $coverageFile")
+    }
   }
 }
-// Test 6.1: Master Deactivation upon SS Low
-// In a multi-master scenario, configure the SS pin to control master activation.
-// Drive SS low and ensure the SPI automatically switches from Master to Slave mode.
 
-// Test 6.2: Tri-state MISO in Slave Mode
-// In Slave mode, configure the MISO pin as output.
-// When SS is high, ensure MISO is tri-stated (disconnected).
-// When SS is low, verify that MISO outputs data correctly.
 
-// Test 7.3: Normal Mode Slave
-// In Slave mode, ensure the SPI logic halts when SS is high and resumes when SS is low.
-
-// Test 7.4: Buffered Mode Slave
-// Enable Buffered Mode in Slave mode and verify that multiple received bytes are stored in the FIFO and transmitted correctly.
-
-// Test 8.1: Add daisy Chaining module and test that with just one test

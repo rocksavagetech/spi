@@ -1,0 +1,179 @@
+package tech.rocksavage.chiselware.SPI
+
+import scala.math.pow
+import scala.util.Random
+
+import TestUtils._
+import chisel3._
+import chisel3.util._
+import chiseltest._
+import org.scalatest.Assertions._
+import org.scalatest.flatspec.AnyFlatSpec
+
+object modeTests extends ApbUtils {
+    def bufferTx(
+        dut: FullDuplexSPI,
+        myParams: BaseParams
+    ): Unit = {
+        implicit val clk: Clock = dut.clock // Provide implicit clock
+
+        // Generate random data for Master and Slave according to the randomized myParams.dataWidth
+        val masterData = BigInt(myParams.dataWidth, Random)  // Randomized data for master
+        val slaveData = BigInt(myParams.dataWidth, Random)   // Randomized data for slave
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000000".U) // Enable Buffer Mode. Needs to be done BEFORE writing data
+
+        // Set up Master to transmit and Slave to receive
+        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
+        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
+
+        // Enable both Master and Slave
+        writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00100000".U) // Enable DREIF interrupt
+        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
+        dut.clock.step(1)
+        val transmitBuffer = BigInt(myParams.dataWidth, Random)  // Randomized data for master
+        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, transmitBuffer.U) // Write new data before transfer completes
+        // check that transmit buffer is not empty and has expected value
+        //dut.clock.step(2*(myParams.dataWidth-1))
+
+        for (i <- 0 until myParams.dataWidth*2) {
+          if (i < myParams.dataWidth) {
+            val masterBit = (masterData >> (myParams.dataWidth - 1 - i)) & 1  // Sending MSB first
+            //dut.io.master.mosi.expect(masterBit.B)
+          } else {
+            val masterBit = (transmitBuffer >> (myParams.dataWidth - 1 - i)) & 1
+            //dut.io.master.mosi.expect(masterBit.B)
+          }
+            dut.clock.step(4)
+        }
+    }
+
+    def normalRx(
+        dut: FullDuplexSPI,
+        myParams: BaseParams
+    ): Unit = {    
+        implicit val clk: Clock = dut.clock // Provide implicit clock
+
+        // Generate random data for Master and Slave according to the randomized myParams.dataWidth
+        val masterData = BigInt(myParams.dataWidth, Random)  // Randomized data for master
+        val slaveData = BigInt(myParams.dataWidth, Random)   // Randomized data for slave
+
+        // Set up Master to transmit and Slave to receive
+        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
+        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
+
+        writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00000001".U) //Enable transmit complete interrupt
+
+        // Enable both Master and Slave
+        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b01000001".U) // Set Slave
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b01100001".U) // Set Master in Master mode
+
+        // Simulate SPI clock cycles
+        for (i <- 0 until myParams.dataWidth) {
+          // Extract the current bit from the master and slave data
+          val masterBit = ((masterData & (1 << i)) >> i) & 1 // sending LSB first
+          val slaveBit = ((slaveData & (1 << i)) >> i) & 1 // sending LSB first
+
+          dut.io.master.mosi.expect(masterBit.B)
+          dut.io.slave.miso.expect(slaveBit.B)
+
+          dut.clock.step(4)
+        }
+        val readReg = readAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U)
+        val readInt = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
+        require(readReg === slaveData)
+        require(readInt === 128)
+        writeAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U, "b10000000".U)  //Clear Interrupt
+        require(readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U) === 0)
+    }
+
+    def bufferRx(
+        dut: FullDuplexSPI,
+        myParams: BaseParams
+    ): Unit = {   
+       implicit val clk: Clock = dut.clock // Provide implicit clock
+
+        // Generate random data for Master and Slave according to the randomized myParams.dataWidth
+        val masterData = BigInt(myParams.dataWidth, Random)  // Randomized data for master
+        val slaveData = BigInt(myParams.dataWidth, Random)   // Randomized data for slave
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000000".U) // Enable Buffer Mode. Needs to be done BEFORE writing data
+
+        // Set up Master to transmit and Slave to receive
+        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
+        writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
+
+        // Enable both Master and Slave
+        //writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00100000".U) // Enable DREIF interrupt
+        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
+        dut.clock.step(1)
+        val transmitBuffer = BigInt(myParams.dataWidth, Random)  // Randomized data for master
+        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, transmitBuffer.U) // Write new data before transfer completes
+        // check that transmit buffer is not empty and has expected value
+        //dut.clock.step(2*(myParams.dataWidth-1))
+
+          for (i <- 0 until myParams.dataWidth * 2) {
+            if (i < myParams.dataWidth) {
+              val masterBit =
+                (masterData >> (myParams.dataWidth - 1 - i)) & 1 // Sending MSB first
+              // dut.io.master.mosi.expect(masterBit.B)
+            } else {
+              val masterBit = (transmitBuffer >> (myParams.dataWidth - 1 - i)) & 1
+              // dut.io.master.mosi.expect(masterBit.B)
+            }
+            dut.clock.step(4)
+          }
+          val readReg = readAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U)
+          //gtkwave not working, need to debug why DATA is empty
+    }
+
+    def daisyChain(
+        dut: DaisyChainSPI,
+        myParams: BaseParams
+    ): Unit = {   
+        implicit val clk: Clock = dut.clock // Provide implicit clock
+
+        // Generate random data for Master and Slave according to the randomized myParams.dataWidth
+        val masterData1 = BigInt(myParams.dataWidth, Random)  // Randomized data for master
+        val masterData2 = BigInt(myParams.dataWidth, Random)   // Randomized data
+        val masterData3 = BigInt(myParams.dataWidth, Random) 
+        val masterData4 = BigInt(myParams.dataWidth, Random) 
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000000".U) // Enable Buffer Mode. Needs to be done BEFORE writing data
+        // Set up Master to transmit and Slave to receive
+        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData1.U)
+
+        // Enable both Master and Slave
+        writeAPB(dut.io.slave1Apb, dut.slave1.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
+        writeAPB(dut.io.slave2Apb, dut.slave2.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
+        writeAPB(dut.io.slave3Apb, dut.slave3.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
+        dut.clock.step(1)
+        writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData2.U) // Write new data before transfer completes
+        // check that transmit buffer is not empty and has expected value
+        //dut.clock.step(2*(myParams.dataWidth-1))
+
+          for (i <- 0 until myParams.dataWidth * 2) {
+            if (i < myParams.dataWidth) {
+              val masterBit = (masterData1 >> (myParams.dataWidth - 1 - i)) & 1 // Sending MSB first
+              // dut.io.master.mosi.expect(masterBit.B)
+            } else {
+              val masterBit = (masterData2 >> (myParams.dataWidth - 1 - i)) & 1
+              // dut.io.master.mosi.expect(masterBit.B)
+            }
+            dut.clock.step(4)
+          }
+          writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData3.U)
+          for (i <- 0 until myParams.dataWidth) {
+              val masterBit = (masterData3 >> (myParams.dataWidth - 1 - i)) & 1 // Sending MSB first
+              //dut.io.master.mosi.expect(masterBit.B)
+              dut.clock.step(4)
+          }
+          writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData4.U)
+          for (i <- 0 until myParams.dataWidth*3) {  //Need to go through 3 more cycles for everything to loop back to master
+              dut.clock.step(4)
+          }
+
+          val readReg = readAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U)
+          //gtkwave not working, need to debug why DATA is empty    
+    }
+}

@@ -31,7 +31,7 @@ class GPIOTest
     extends AnyFlatSpec
     with ChiselScalatestTester
     with Matchers
-    with APBUtils {
+    with ApbUtils {
 
   val verbose = false
   val numTests = 1
