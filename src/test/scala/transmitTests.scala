@@ -89,8 +89,8 @@ object transmitTests extends ApbUtils {
           slaveThread.join()
 
           // Assertions to verify data transmission
-          val receivedMasterData = dut.io.spiShiftOutMaster.peek().litValue
-          val receivedSlaveData = dut.io.spiShiftOutSlave.peek().litValue
+          val receivedMasterData = readAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U)
+          val receivedSlaveData = readAPB(dut.io.slaveApb, dut.master.regs.DATA_ADDR.U)
 
           // Verify that the master received the slave's data
           receivedMasterData should be (slaveData)

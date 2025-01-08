@@ -12,9 +12,6 @@ class FullDuplexSPI(p: BaseParams) extends Module {
     // Expose the master and slave SPI interfaces for Full Duplex operation
     val master = new MasterInterface
     val slave  = new SlaveInterface
-
-    val spiShiftOutSlave = Output(UInt(p.dataWidth.W))
-    val spiShiftOutMaster = Output(UInt(p.dataWidth.W))
   })
 
   // Instantiate the SPI master and slave 
@@ -36,10 +33,6 @@ class FullDuplexSPI(p: BaseParams) extends Module {
 
   // Slave -> Master
   master.io.master.miso := slave.io.slave.miso  // Master gets MISO from slave
-
-  //connect the shift out signals
-  io.spiShiftOutSlave := slave.io.spiShiftOut
-  io.spiShiftOutMaster := master.io.spiShiftOut
 
   master.io.slave.mosi := 0.U
   slave.io.master.miso := 0.U
