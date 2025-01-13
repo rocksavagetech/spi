@@ -2,15 +2,15 @@ package tech.rocksavage.chiselware.SPI
 
 import scala.math.pow
 import scala.util.Random
-
 import TestUtils._
 import chisel3._
 import chisel3.util._
 import chiseltest._
 import org.scalatest.Assertions._
 import org.scalatest.flatspec.AnyFlatSpec
+import tech.rocksavage.chiselware.SPI.ApbUtils.{readAPB, writeAPB}
 
-object modeTests extends ApbUtils {
+object modeTests {
     def bufferTx(
         dut: FullDuplexSPI,
         myParams: BaseParams

@@ -32,8 +32,7 @@ import firrtl2.options.TargetDirAnnotation
 class GpioTest
     extends AnyFlatSpec
     with ChiselScalatestTester
-    with Matchers
-    with ApbUtils {
+    with Matchers {
 
   val verbose = false
   val numTests = 2
@@ -72,7 +71,7 @@ class GpioTest
   }
 
   // Execute the regressigiyon across a randomized range of configurations
-  if (testName == "regression") (1 to numTests).foreach { config => 
+  if (testName == "regression") (1 to numTests).foreach { config =>
     main(s"GPIO_test_config_$config")
   }
   else {
@@ -111,7 +110,7 @@ class GpioTest
                 val cov = test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 transmitTests.slaveMode(dut, myParams)
             }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)                  
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
             }
 
         // Test 2.1: Full Duplex Transmission (Master-Slave) for all SPI Modes with Randomized DataWidth
@@ -120,7 +119,7 @@ class GpioTest
             val cov =  test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 transmitTests.fullDuplex(dut, myParams)
             }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)                
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
             }
 
         // Test 2.2: MSB First and LSB First Data Order
@@ -173,7 +172,7 @@ class GpioTest
                 }
             coverageCollection(cov.getAnnotationSeq, myParams, testName)
             }
-        
+
         // Test 4.3: Data Register Empty Interrupt
         case "dataEmpty" =>
             it should "data register empty interrupt flag" in {
@@ -223,7 +222,7 @@ class GpioTest
             }
             coverageCollection(cov.getAnnotationSeq, myParams, testName)
             }
-        
+
         case "modeTests" =>
             modeTestsFull(myParams)
 
@@ -254,7 +253,7 @@ class GpioTest
     }
 
 
-      
+
     //}
 
   def allTests(
@@ -281,14 +280,14 @@ class GpioTest
         val cov = test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         transmitTests.slaveMode(dut, myParams)
     }
-    coverageCollection(cov.getAnnotationSeq, myParams, "slaveMode")                  
+    coverageCollection(cov.getAnnotationSeq, myParams, "slaveMode")
     }
 
     it should "transmit and receive data correctly in Full Duplex mode (Master-Slave) for all SPI modes" in {
     val cov =  test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         transmitTests.fullDuplex(dut, myParams)
     }
-    coverageCollection(cov.getAnnotationSeq, myParams, "fullDuplex")                
+    coverageCollection(cov.getAnnotationSeq, myParams, "fullDuplex")
     }
 
     it should "transmit and receive data correctly in MSB and LSB first modes" in {
@@ -299,7 +298,7 @@ class GpioTest
     }
 
   }
-  
+
   def clockTestsFull(
       myParams: BaseParams
   ): Unit = {

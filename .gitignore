@@ -14,6 +14,9 @@ project/project/
 project/target/
 target/
 
+# Jetbrains
+.idea/
+
 # eclipse
 build/
 .classpath
@@ -23,14 +26,7 @@ build/
 bin/
 .cache
 
-# intellij idea
-*.log
-*.iml
-*.ipr
-*.iws
-.idea
-
-# MacOS
+# mac
 .DS_Store
 
 # other?
@@ -43,17 +39,7 @@ bin/
 
 # build output
 out
-generated
-*.anno.json
-build.properties
-test_run_dir
+generated/
+/test_run_dir/
 
-# LaTeX
-*.aux
-*.toc
-*.out
-*.log
-*.fdb_latexmk
-*.fls
-*.synctex.gz
-*.pdf
+

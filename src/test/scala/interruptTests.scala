@@ -2,15 +2,15 @@ package tech.rocksavage.chiselware.SPI
 
 import scala.math.pow
 import scala.util.Random
-
 import TestUtils._
 import chisel3._
 import chisel3.util._
 import chiseltest._
 import org.scalatest.matchers.should.Matchers._
+import tech.rocksavage.chiselware.SPI.ApbUtils.{readAPB, writeAPB}
 
 
-object interruptTests extends ApbUtils {
+object interruptTests {
     def txComplete(
         dut: FullDuplexSPI,
         myParams: BaseParams

@@ -2,13 +2,13 @@ package tech.rocksavage.chiselware.SPI
 
 import scala.math.pow
 import scala.util.Random
-
 import TestUtils._
 import chisel3._
 import chisel3.util._
 import chiseltest._
+import tech.rocksavage.chiselware.SPI.ApbUtils.writeAPB
 
-object clockTests extends ApbUtils {
+object clockTests {
     def prescaler(
         dut: FullDuplexSPI,
         myParams: BaseParams
