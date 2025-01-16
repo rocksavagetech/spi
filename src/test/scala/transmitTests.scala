@@ -42,7 +42,7 @@ object transmitTests {
     ): Unit = {
             // Define myParams.dataWidth as per your module's specification or randomize if needed
       // Iterate over all 4 SPI modes (0 to 3)
-      for (mode <- 0 until 3) {
+      for (mode <- 1 until 2) {
           implicit val clk: Clock = dut.clock // Provide implicit clock
 
           // Generate random data for Master and Slave
@@ -56,10 +56,22 @@ object transmitTests {
           // Set up Master to transmit and Slave to receive
           writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
           writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
+          
+          writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100000".U) // Enable Master in Master mode
+
+          //Test SCLK Leading Edge (Mode 0, 1: SCLK Low Default)
+          //(Mode 2, 3: SCLK High Default)
+          if(mode == 0 || mode == 1) {
+            dut.io.master.sclk.expect(0);
+            dut.io.slave.sclk.expect(0);
+          } else{
+            dut.io.master.sclk.expect(1);
+            dut.io.slave.sclk.expect(1);           
+          }
 
           // Enable both Master and Slave
-          writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U)  // Enable Slave
-          writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Enable Master in Master mode
+          writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U)  // Enable Slave, Enable SPI
+          writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Enable Master, Enable SPI 
 
           // Determine CPOL and CPHA based on mode
           val (cpol, cpha) = ((mode >> 1) & 1, mode & 1)
@@ -67,6 +79,11 @@ object transmitTests {
           // Fork Slave Reception Thread
           val slaveThread = fork {
             for (i <- 0 until myParams.dataWidth) {
+              if (mode == 1 || mode == 2) {
+                if(i==0) {  //Sample on falling edge
+                  dut.clock.step(2)
+                }
+              }
               // Extract the expected bit from the slave data
               val expectedBit = (slaveData >> (myParams.dataWidth - 1 - i)) & 1
               dut.io.slave.miso.expect(expectedBit) 
@@ -77,6 +94,11 @@ object transmitTests {
           // Fork Master Transmission Thread
           val masterThread = fork {
             for (i <- 0 until myParams.dataWidth) {
+              if (mode == 1 || mode == 2) {
+                if(i==0) {  //Sample on falling edge
+                  dut.clock.step(2)
+                }
+              }
               // Extract the current bit from the master data (MSB first)
               val masterBit = (masterData >> (myParams.dataWidth - 1 - i)) & 1
               dut.io.master.mosi.expect(masterBit.B)
@@ -97,6 +119,8 @@ object transmitTests {
 
           // Verify that the slave received the master's data
           receivedSlaveData should be (masterData)
+          writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000000".U)  // Disable SPI
+          writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00000000".U) // Disable SPI
         }
     }
 

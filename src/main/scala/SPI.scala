@@ -107,8 +107,7 @@ class SPI(p: BaseParams) extends Module {
       // printf("idle\n")
       shiftCounter := 0.U
       when(regs.CTRLA(5) === 1.U) { // Master Mode
-        sclkReg := !((regs
-          .CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
+        sclkReg := !((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
         when((writeData) && (regs.CTRLA(0) === 1.U)) { // When the DATA register is written to and SPI is enabled
           when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In Buffer mode, when buffer has data
             spiShift := transmitBuffer
@@ -318,7 +317,7 @@ class SPI(p: BaseParams) extends Module {
           io.apb.PWDATA,
           addr
         )
-        writeData := true.B
+        //writeData := true.B
         val shiftAddr = (addr - regs.DATA_ADDR.U)
         transmitBuffer := (io.apb.PWDATA(regs.DATA_SIZE - 1, 0) << (shiftAddr(
           regs.DATA_REG_SIZE - 1,
