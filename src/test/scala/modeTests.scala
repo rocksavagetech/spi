@@ -21,20 +21,23 @@ object modeTests {
         val masterData = BigInt(myParams.dataWidth, Random)  // Randomized data for master
         val slaveData = BigInt(myParams.dataWidth, Random)   // Randomized data for slave
         writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000000".U) // Enable Buffer Mode. Needs to be done BEFORE writing data
+        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLB_ADDR.U, "b10000000".U) // Enable Buffer Mode for slave too
 
         // Set up Master to transmit and Slave to receive
         writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
         writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
 
         // Enable both Master and Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b00100000".U) // Enable DREIF interrupt
+        writeAPB(dut.io.masterApb, dut.master.regs.INTCTRL_ADDR.U, "b01000000".U) // Enable Tx Comp interrupt
         writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
         writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100001".U) // Set Master in Master mode
         dut.clock.step(1)
         val transmitBuffer = BigInt(myParams.dataWidth, Random)  // Randomized data for master
         writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, transmitBuffer.U) // Write new data before transfer completes
+        val readFlag = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
+        require(readFlag === 32)
         // check that transmit buffer is not empty and has expected value
-        //dut.clock.step(2*(myParams.dataWidth-1))
+        dut.clock.step(2*(myParams.dataWidth-1))
 
         for (i <- 0 until myParams.dataWidth*2) {
           if (i < myParams.dataWidth) {
@@ -44,8 +47,19 @@ object modeTests {
             val masterBit = (transmitBuffer >> (myParams.dataWidth - 1 - i)) & 1
             //dut.io.master.mosi.expect(masterBit.B)
           }
-            dut.clock.step(4)
+          dut.clock.step(4)
         }
+        val readFlag2 = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
+        require(readFlag2 === 64)
+        val readReg = readAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U)
+        println(s"readReg Read: ${readReg.toString()}")
+        println(s"masterData Read: ${masterData.toString()}")
+        require(readReg === masterData)
+        dut.clock.step(2*(myParams.dataWidth-1))
+        val readReg2 = readAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U)
+        require(readReg2 === transmitBuffer)
+        dut.clock.step(2*(myParams.dataWidth-1))
+
     }
 
     def normalRx(

@@ -95,6 +95,9 @@ class SPI(p: BaseParams) extends Module {
     when(regs.CTRLB(7) === 0.U) { // In Normal Mode
       regs.INTFLAGS := regs.INTFLAGS | (1.U << 6.U) // Write Collision
     }
+    when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U){ // In buffer mode, when buffer doesnt have space
+      regs.INTFLAGS := regs.INTFLAGS | (1.U << 0.U)
+    }
   }
 
   // Notes:
@@ -146,18 +149,7 @@ class SPI(p: BaseParams) extends Module {
             shiftCounter := shiftCounter + 1.U
             stateReg := masterMode
           }.otherwise {
-            when(
-              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U
-            ) { // In Buffer mode, when transmit buffer still has data
-              printf("Buffer Mode\n")
-              shiftCounter := 0.U
-              spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
-              writeData := false.B
-              stateReg := masterMode
-            }.otherwise {
               stateReg := complete
-            }
           }
         }
       }.otherwise {
@@ -173,17 +165,7 @@ class SPI(p: BaseParams) extends Module {
             shiftCounter := shiftCounter + 1.U
             stateReg := masterMode
           }.otherwise {
-            when(
-              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U
-            ) { // In Buffer mode, when transmit buffer still has data
-              shiftCounter := 0.U
-              spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
-              writeData := false.B
-              stateReg := masterMode
-            }.otherwise {
               stateReg := complete
-            }
           }
         }
       }
@@ -207,17 +189,7 @@ class SPI(p: BaseParams) extends Module {
               slaveMode
             ) // When cs goes high, abondon all transmissions and go back to idle
           }.otherwise {
-            when(
-              regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U
-            ) { // In Buffer mode, when transmit buffer still has data
-              shiftCounter := 0.U
-              spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
-              writeData := false.B
-              stateReg := Mux(io.slave.cs, idle, slaveMode)
-            }.otherwise {
               stateReg := complete
-            }
           }
         }
       }.otherwise {
@@ -233,15 +205,7 @@ class SPI(p: BaseParams) extends Module {
             shiftCounter := shiftCounter + 1.U
             stateReg := Mux(io.slave.cs, idle, slaveMode)
           }.otherwise {
-            when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In Buffer mode, when transmit buffer still has data
-              shiftCounter := 0.U
-              spiShift := transmitBuffer
-              regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
-              writeData := false.B
-              stateReg := Mux(io.slave.cs, idle, slaveMode)
-            }.otherwise {
               stateReg := complete
-            }
           }
         }
       }
@@ -258,7 +222,21 @@ class SPI(p: BaseParams) extends Module {
       when(regs.CTRLB(7) === 0.U && regs.INTCTRL(0) === 1.U) { // In Normal mode, when interrupts are enabled
         regs.INTFLAGS := regs.INTFLAGS | (1.U << 7.U) // Set it
       }
-      stateReg := idle
+
+      when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In Buffer mode, when transmit buffer still has data
+        shiftCounter := 0.U
+        spiShift := transmitBuffer
+        regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
+        writeData := false.B
+        when(regs.CTRLA(5) === 1.U) {
+          stateReg := masterMode //Even in bufferMode, still need to go to complete state to save data in recieveReg
+        }.otherwise {
+          //stateReg := slaveMode //Hmmm...
+          stateReg := Mux(io.slave.cs, idle, slaveMode)
+        }
+      }.otherwise {
+        stateReg := idle
+      }
     }
   }
 

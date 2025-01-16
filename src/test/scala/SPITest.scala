@@ -29,7 +29,7 @@ import firrtl2.options.TargetDirAnnotation
   * code coverage for all top-level ports. Inspired by the DynamicFifo
   */
 
-class GpioTest
+class SpiTest
     extends AnyFlatSpec
     with ChiselScalatestTester
     with Matchers {

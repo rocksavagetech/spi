@@ -29,7 +29,7 @@ object ApbUtils {
     apb.PWRITE.poke(0.U)         // Set to read mode
     apb.PADDR.poke(addr)         // Provide the target address
 
-    clock.step(1)                // Simulate the second clock cycle to allow the read
+    //clock.step(1)                // Simulate the second clock cycle to allow the read
 
     val readValue = apb.PRDATA.peekInt() // Capture the data being read
     clock.step(1)                // Step for the read operation
