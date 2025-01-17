@@ -25,7 +25,7 @@ object clockTests {
 
         // Enable both Master and Slave
         writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100101".U) // Set Master in Master mode
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100101".U) // Set Master in Master mode, DIV64
 
         // Simulate SPI clock cycles
         for (i <- 0 until myParams.dataWidth) {
@@ -55,7 +55,7 @@ object clockTests {
 
         // Enable both Master and Slave
         writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00110011".U) // Set Master in Master mode
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00110011".U) // Set Master in Master mode, DIV16 x 2
 
         // Simulate SPI clock cycles
         for (i <- 0 until myParams.dataWidth) {

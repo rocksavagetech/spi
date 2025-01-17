@@ -213,20 +213,19 @@ class SpiTest
             coverageCollection(cov.getAnnotationSeq, myParams, testName)
             }
 
-        // Test 7.4: Recieve Register Check Buffer Mode Mode
-        case "bufferRx" =>
-            it should "recieve register correct buffer" in {
-            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-                modeTests.bufferRx(dut, myParams)
-                }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
-            }
-
         //Test 8.1: Daisy Chain Test with 3 Slaves
         case "daisyChain" =>
             it should "daisy chain correctly" in {
             val cov = test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 modeTests.daisyChain(dut, myParams)
+            }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
+        case "daisyChainBuffer" =>
+            it should "daisy chain + buffer correctly" in {
+            val cov = test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                modeTests.daisyChainBuffer(dut, myParams)
             }
             coverageCollection(cov.getAnnotationSeq, myParams, testName)
             }
@@ -355,7 +354,7 @@ class SpiTest
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         interruptTests.overFlow(dut, myParams)
         }
-    coverageCollection(cov.getAnnotationSeq, myParams, "dataEmpty")
+    coverageCollection(cov.getAnnotationSeq, myParams, "overFlow")
     }
   }
 
@@ -376,18 +375,19 @@ class SpiTest
     coverageCollection(cov.getAnnotationSeq, myParams, "normalRx")
     }
 
-    it should "recieve register correct buffer" in {
-    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        modeTests.bufferRx(dut, myParams)
-        }
-    coverageCollection(cov.getAnnotationSeq, myParams, "bufferRx")
-    }
 
     it should "daisy chain correctly" in {
     val cov = test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         modeTests.daisyChain(dut, myParams)
     }
     coverageCollection(cov.getAnnotationSeq, myParams, "daisyChain")
+    }
+
+    it should "daisy chain + buffer correctly" in {
+    val cov = test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        modeTests.daisyChainBuffer(dut, myParams)
+    }
+    coverageCollection(cov.getAnnotationSeq, myParams, "daisyChainBuffer")
     }
   }
 
