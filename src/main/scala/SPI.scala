@@ -95,9 +95,6 @@ class SPI(p: BaseParams) extends Module {
     when(regs.CTRLB(7) === 0.U) { // In Normal Mode
       regs.INTFLAGS := regs.INTFLAGS | (1.U << 6.U) // Write Collision
     }
-    when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U){ // In buffer mode, when buffer doesnt have space
-      regs.INTFLAGS := regs.INTFLAGS | (1.U << 0.U)
-    }
   }
 
   // Notes:
@@ -302,6 +299,9 @@ class SPI(p: BaseParams) extends Module {
           0
         ) * 8.U))
         regs.INTFLAGS := regs.INTFLAGS | (1.U << 5.U) // Lock Buffer
+      }
+      when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U){ // In buffer mode, when buffer doesnt have space
+        regs.INTFLAGS := regs.INTFLAGS | (1.U << 0.U)
       }
     }
   }

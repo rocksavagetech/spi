@@ -182,6 +182,14 @@ class SpiTest
             coverageCollection(cov.getAnnotationSeq, myParams, testName)
             }
 
+        case "overFlow" =>
+            it should "cause buffer overflow flag" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                interruptTests.overFlow(dut, myParams)
+                }
+            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            }
+
         case "interruptTests" =>
             interruptTestsFull(myParams)
 
@@ -339,6 +347,13 @@ class SpiTest
     it should "data register empty interrupt flag" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         interruptTests.dataEmpty(dut, myParams)
+        }
+    coverageCollection(cov.getAnnotationSeq, myParams, "dataEmpty")
+    }
+
+    it should "cause buffer overflow flag" in {
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        interruptTests.overFlow(dut, myParams)
         }
     coverageCollection(cov.getAnnotationSeq, myParams, "dataEmpty")
     }
