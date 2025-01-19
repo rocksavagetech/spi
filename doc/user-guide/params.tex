@@ -1,0 +1,66 @@
+% chktex-file 44
+
+\section{Parameter Descriptions}
+
+The parameters for \textbf{Spi} are shown below in
+Table 3.
+
+\renewcommand*{\arraystretch}{1.4}
+\begingroup
+\small
+\rowcolors{2}{gray!30}{gray!10} % Alternating colors start from the second row
+\arrayrulecolor{gray!50}
+\begin{longtable}[H]{
+    | p{0.25\textwidth}
+    | p{0.10\textwidth}
+    | p{0.05\textwidth}
+    | p{0.05\textwidth}
+    | p{0.47\textwidth} |
+  }
+  \hline
+  \rowcolor{dark-gray}
+
+  \textcolor{white}{\textbf{Name}} &
+  \textcolor{white}{\textbf{Type}} &
+  \textcolor{white}{\textbf{Min}} &
+  \textcolor{white}{\textbf{Max}} &
+  \textcolor{white}{\textbf{Description}} \\ \hline
+  \endfirsthead
+
+  \textcolor{white}{\textbf{Name}} &
+  \textcolor{white}{\textbf{Type}} &
+  \textcolor{white}{\textbf{Min}} &
+  \textcolor{white}{\textbf{Max}} &
+  \textcolor{white}{\textbf{Description}}            \\ \hline
+  \endhead
+
+
+  \endfoot
+
+  dataWidth   &
+  Int       &
+  1         &
+  $\leq$ 32          &
+  The data width of PWDATA, and PRDATA. Can be 8, 6, or 32 bits wide \\ \hline
+
+  addrWidth     &
+  Int           &
+  1             &
+  $\leq$ 32       &
+  The Apb address bus width  \\ \hline
+
+\end{longtable}
+\captionsetup{aboveskip=0pt}
+\captionof{table}{Parameter Descriptions}\label{table:params}
+\endgroup
+
+The Spi is instantiated into a design as follows:
+
+\begin{lstlisting}[language=Scala]
+
+  // Valid Spi Instantiation Example
+  val mySpi = new Spi(
+    dataWidth = 32, 
+    addrWidth = 32 ) 
+
+  \end{lstlisting}

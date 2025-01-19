@@ -1,0 +1,120 @@
+% chktex-file 44
+\section{Synthesis}
+
+\subsection{Area}
+
+The Gpio has been tested in a number of configurations and the following
+results should be representative of what a user should see in their own
+technology.
+
+\renewcommand*{\arraystretch}{1.4}
+\begingroup
+\small
+\begin{longtable}[H]{
+    | p{0.15\textwidth}
+    | p{0.15\textwidth}
+    | p{0.17\textwidth}
+    | p{0.20\textwidth}
+    | p{0.15\textwidth} |
+  }
+  \hline
+  \rowcolor{dark-gray}
+  \textcolor{white}{\textbf{Config Name}}   &
+  \textcolor{white}{\textbf{gpioWidth}}   &
+  \textcolor{white}{\textbf{numVirtualPorts}}     &
+  \textcolor{white}{\textbf{sizeOfVirtualPorts}}     &
+  \textcolor{white}{\textbf{Gates}}           \\ \hline \hline
+  \endfirsthead
+
+  \textcolor{white}{\textbf{Config Name}}   &
+    \textcolor{white}{\textbf{gpioWidth}}   &
+    \textcolor{white}{\textbf{numVirtualPorts}}     &
+    \textcolor{white}{\textbf{sizeOfVirtualPorts}}     &
+    \textcolor{white}{\textbf{Gates}}           \\ \hline \hline
+  \endhead
+
+  \hline
+  \endfoot
+
+  8\_8\_8   &
+  8                      &
+  8                      &
+  8                      &
+  6734                   \\ \hline
+
+  16\_8\_8  &
+  16                     &
+  8                      &
+  8                      &
+  9325                   \\ \hline
+
+  32\_8\_8  &
+  32                     &
+  8                      &
+  8                      &
+  14981                  \\ \hline
+
+\end{longtable}
+\captionsetup{aboveskip=0pt}
+\captionof{table}{Synthesis results}\label{table:area}
+\endgroup
+
+\subsection{SDC File}
+An \texttt{.sdc} file is generated to provide synthesis and static timing
+analysis tools guidance for synthesis.
+
+The \texttt{Gpio.sdc} file is emitted and found in the
+\texttt{./out/sta} directory.
+
+\subsection{Timing}
+
+The following timing was extracted using the generated~.sdc files using the
+Nangate 45nm free library.
+
+\renewcommand*{\arraystretch}{1.4}
+\begin{longtable}[H]{
+    | p{0.20\textwidth}
+    | p{0.08\textwidth}
+    | p{0.12\textwidth}
+    | p{0.13\textwidth}
+    | p{0.15\textwidth}
+    | p{0.15\textwidth} |
+  }
+  \hline
+  \rowcolor{dark-gray}
+  \textcolor{white}{\textbf{Config Name}}   &
+  \textcolor{white}{\textbf{Period}}        &
+  \textcolor{white}{\textbf{Duty Cycle}}    &
+  \textcolor{white}{\textbf{Input Delay}}   &
+  \textcolor{white}{\textbf{Output Delay}}  &
+  \textcolor{white}{\textbf{Slack}}           \\ \hline \hline
+
+  8\_8\_8     &
+  5ns                    &
+  50\%                   &
+  20\%                   &
+  20\%                   &
+  1.79 (MET)               \\ \hline
+
+  8\_8\_8  &
+  5ns                    &
+  50\%                   &
+  20\%                   &
+  20\%                   &
+  1.79 (MET)               \\ \hline
+
+  8\_8\_8  &
+  5ns                    &
+  50\%                   &
+  20\%                   &
+  20\%                   &
+  1.81 (MET)               \\ \hline
+
+  
+\end{longtable}
+\captionsetup{aboveskip=0pt}
+\captionof{table}{Static Timing Analysis results}\label{table:timing}
+\endgroup
+
+\subsection{Multicycle Paths}
+None.

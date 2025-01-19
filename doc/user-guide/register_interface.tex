@@ -1,0 +1,329 @@
+% chktex-file 44
+\subsection{Register Interface}
+ 
+When programming registers, each register starts on a byte address, and the last bits it would take up in its final byte based on its size are unused. To find the size in bytes for any register, divide by the register size, and round up to the nearest whole number. For example, a 32-bit register would take up 4 bytes, and a 1-bit register would take up 1 byte.
+\renewcommand*{\arraystretch}{1.4}
+\begingroup
+\small
+\rowcolors{2}{gray!30}{gray!10} % Alternating colors start from the second row
+\arrayrulecolor{gray!50}
+\begin{longtable}[H]{
+  | p{0.27\textwidth}
+  | p{0.18\textwidth}
+  | p{0.50\textwidth} |
+  }
+  \hline
+  \rowcolor{dark-gray}
+
+  \textcolor{white}{\textbf{Name}} &   
+  \textcolor{white}{\textbf{Size (Bits)}} &   
+  \textcolor{white}{\textbf{Description}} \\ \hline \hline
+  \endfirsthead
+
+  \textcolor{white}{\textbf{Name}} &   
+  \textcolor{white}{\textbf{Size (Bits)}} &   
+  \textcolor{white}{\textbf{Description}} \\ \hline \hline
+  \endhead
+
+  
+  CTRLA  &   
+  8 &   
+  DESC TODO \\ \hline
+
+  CTRLB &   
+  8 &   
+  DESC TODO \\ \hline
+
+  INTCTRL &   
+  8 &   
+  DESC TODO \\ \hline
+
+  INTFLAGS &   
+  8 &   
+  DESC TODO \\ \hline
+
+  DATA&   
+  dataWidth &   
+  DESC TODO \\ \hline
+
+\end{longtable}
+\captionsetup{aboveskip=0pt}
+\captionof{table}{Register Interface}\label{table:register}
+
+  \newpage
+
+  \section{Register Description}
+
+  \subsection{Control Register A (\texttt{CTRLA})}
+  \label{sec:ctrla}
+  
+  \begin{table}[H]
+      \centering
+      \caption{Control Register A (\texttt{CTRLA})}
+      \begin{tabular}{@{}cccccccc@{}}
+          \toprule
+          \textbf{Bit} & 7 & 6 & 5 & 4 & 3 & 2-1 & 0 \\ \midrule
+          \textbf{Name} & N/A & DORD & MASTER & CLK2X & N/A & PRESC[1:0] & ENABLE \\ \bottomrule
+      \end{tabular}
+      \label{tab:ctrl_a}
+  \end{table}
+  
+  \begin{itemize}
+      \item \textbf{Bit 6 - DORD (Data Order):} 
+      \begin{itemize}
+          \item \texttt{0}: MSB (Most Significant Bit) transmitted first.
+          \item \texttt{1}: LSb (Least Significant Bit) transmitted first.
+      \end{itemize}
+      \textit{Description:} This bit configures the order in which data bits are transmitted and received. Selecting LSb first can be beneficial for certain peripherals or communication protocols that prioritize lower-order bits.
+      
+      \item \textbf{Bit 5 - MASTER:} 
+      \begin{itemize}
+          \item \texttt{0}: Slave mode.
+          \item \texttt{1}: Master mode.
+      \end{itemize}
+      \textit{Description:} Determines whether the SPI core operates as a master or a slave. In master mode, the core generates the clock and controls SS lines. In slave mode, it responds to the master's commands.
+      
+      \item \textbf{Bit 4 - CLK2X (Clock Double):} 
+      \begin{itemize}
+          \item \texttt{0}: SPI clock rate not doubled.
+          \item \texttt{1}: SPI clock rate doubled.
+      \end{itemize}
+      \textit{Description:} When set, this bit doubles the SPI clock frequency after prescaling in master mode, effectively increasing data transfer speed.
+      
+      \item \textbf{Bits 2-1 - PRESC[1:0] (Prescaler):} 
+      \begin{itemize}
+          \item \texttt{00}: Divide by 4.
+          \item \texttt{01}: Divide by 16.
+          \item \texttt{10}: Divide by 64.
+          \item \texttt{11}: Divide by 128.
+      \end{itemize}
+      \textit{Description:} These bits define the base division factor applied to the peripheral clock to generate the SPI clock rate. Higher division factors result in lower SPI clock speeds.
+      
+      \item \textbf{Bit 0 - ENABLE:} 
+      \begin{itemize}
+          \item \texttt{0}: SPI disabled.
+          \item \texttt{1}: SPI enabled.
+      \end{itemize}
+      \textit{Description:} Activates or deactivates the SPI core. Disabling the SPI core can save power when communication is not required.
+  \end{itemize}
+  
+  \subsection{Control Register B (\texttt{CTRLB})}
+  \label{sec:ctrlb}
+  
+  \begin{table}[H]
+      \centering
+      \caption{Control Register B (\texttt{CTRLB})}
+      \begin{tabular}{@{}cccccccc@{}}
+          \toprule
+          \textbf{Bit} & 7 & 6 & 5 & 4 & 3 & 2 & 1-0 \\ \midrule
+          \textbf{Name} & BUFEN & N/A & N/A & N/A & N/A & N/A & MODE[1:0] \\ \bottomrule
+      \end{tabular}
+      \label{tab:ctrl_b}
+  \end{table}
+  
+  
+  \begin{itemize}
+      \item \textbf{Bit 7 - BUFEN (Buffer Enable):} 
+      \begin{itemize}
+          \item \texttt{0}: Buffer mode disabled.
+          \item \texttt{1}: Buffer mode enabled.
+      \end{itemize}
+      \textit{Description:} When set, enables buffer mode, allowing the SPI core to handle multiple data bytes efficiently through additional buffering mechanisms.
+      
+      \item \textbf{Bits 1-0 - MODE[1:0] (Mode Selection):} 
+      \begin{itemize}
+          \item \texttt{00}: Mode 0.
+          \item \texttt{01}: Mode 1.
+          \item \texttt{10}: Mode 2.
+          \item \texttt{11}: Mode 3.
+      \end{itemize}
+      \textit{Description:} Selects the SPI data transfer mode based on CPOL and CPHA settings, defining the timing relationship between the clock and data signals.
+  \end{itemize}
+  
+  \subsection{Interrupt Control Register (\texttt{INTCTRL})}
+  \label{sec:intctrl}
+  
+  \begin{table}[H]
+      \centering
+      \caption{Interrupt Control Register (\texttt{INTCTRL})}
+      \begin{tabular}{@{}ccccccc@{}}
+          \toprule
+          \textbf{Bit} & 7 & 6 & 5 & 4 & 3-1 & 0 \\ \midrule
+          \textbf{Name} & N/A & TXCIE & N/A & N/A & N/A & IE \\ \bottomrule
+      \end{tabular}
+      \label{tab:intctrl}
+  \end{table}
+  
+  \begin{itemize}
+      
+      \item \textbf{Bit 6 - TXCIE (Transfer Complete Interrupt Enable):} 
+      \begin{itemize}
+          \item \texttt{0}: Transfer Complete interrupt disabled.
+          \item \texttt{1}: Transfer Complete interrupt enabled.
+      \end{itemize}
+      \textit{Description:} Enables the generation of an interrupt when a data transmission cycle is complete in buffer mode, signaling that the transmit buffer is empty and ready for new data.
+      
+      \item \textbf{Bit 0 - IE (Interrupt Enable):} 
+      \begin{itemize}
+          \item \texttt{0}: General interrupts in normal mode disabled.
+          \item \texttt{1}: General interrupts in normal mode enabled.
+      \end{itemize}
+      \textit{Description:} Controls the overall interrupt functionality in normal mode. When set, the SPI core can generate interrupts based on the \texttt{IF} flag in normal mode.
+  \end{itemize}
+  
+  \subsection{Interrupt Flags Register (\texttt{INTFLAGS})}
+  \label{sec:intflags}
+  
+  The Interrupt Flags Register (\texttt{INTFLAGS}) monitors various interrupt conditions and flags. Its behavior varies depending on whether the SPI core is operating in normal mode or buffer mode.
+  
+  \subsubsection{Normal Mode}
+  In normal mode, the \texttt{INTFLAGS} register contains the following flags:
+  
+  \begin{table}[H]
+      \centering
+      \caption{Interrupt Flags Register (\texttt{INTFLAGS}) - Normal Mode}
+      \begin{tabular}{@{}cc@{}}
+          \toprule
+          \textbf{Bit} & \textbf{Name} \\ \midrule
+          7 & IF \\
+          6 & WRCOL \\ \bottomrule
+      \end{tabular}
+      \label{tab:intflags_normal}
+  \end{table}
+  
+  \begin{itemize}
+      \item \textbf{Bit 7 - IF (Interrupt Flag):} 
+      \begin{itemize}
+          \item \texttt{0}: No interrupt.
+          \item \texttt{1}: Interrupt flag set, indicating a data transfer has completed.
+      \end{itemize}
+      \textit{Description:} This flag is set automatically when a data transfer cycle is finished. It can be cleared by executing the corresponding interrupt vector or by reading the \texttt{INTFLAGS} register followed by accessing the \texttt{DATA} register.
+      
+      \item \textbf{Bit 6 - WRCOL (Write Collision Flag):} 
+      \begin{itemize}
+          \item \texttt{0}: No write collision detected.
+          \item \texttt{1}: Write collision occurred, indicating an attempt to write to \texttt{DATA} during an ongoing transfer.
+      \end{itemize}
+      \textit{Description:} This flag alerts the system to potential data corruption caused by simultaneous write attempts. It must be cleared by first reading the \texttt{INTFLAGS} register and then accessing the \texttt{DATA} register.
+  \end{itemize}
+  
+  \subsubsection{Buffer Mode}
+  In buffer mode, the \texttt{INTFLAGS} register encompasses additional flags to manage enhanced data handling:
+  
+  \begin{table}[H]
+      \centering
+      \caption{Interrupt Flags Register (\texttt{INTFLAGS}) - Buffer Mode}
+      \begin{tabular}{@{}cccccc@{}}
+          \toprule
+          \textbf{Bit} & 7 & 6 & 5 & 4 & 0 \\ \midrule
+          \textbf{Name} & N/A & TXCIF & DREIF & N/A & BUFOVF \\ \bottomrule
+      \end{tabular}
+      \label{tab:intflags_buffer}
+  \end{table}
+  
+  \begin{itemize}
+      
+      \item \textbf{Bit 6 - TXCIF (Transfer Complete Interrupt Flag):} 
+      \begin{itemize}
+          \item \texttt{0}: Transfer not complete.
+          \item \texttt{1}: Transfer complete and transmit buffer is empty.
+      \end{itemize}
+      \textit{Description:} Signals that all data in the transmit shift register has been shifted out, and there is no new data pending in the transmit buffer. This flag is cleared by writing a \texttt{1} to its bit position.
+      
+      \item \textbf{Bit 5 - DREIF (Data Register Empty Interrupt Flag):} 
+      \begin{itemize}
+          \item \texttt{0}: \texttt{DATA} register not ready for new data.
+          \item \texttt{1}: \texttt{DATA} register is ready to accept new data.
+      \end{itemize}
+      \textit{Description:} Indicates that the \texttt{DATA} register is empty and ready to receive new data for transmission. Writing new data to \texttt{DATA} clears this flag, either by writing the data or disabling the interrupt.
+      
+      \item \textbf{Bit 0 - BUFOVF (Buffer Overflow Flag):} 
+      \begin{itemize}
+          \item \texttt{0}: No buffer overflow.
+          \item \texttt{1}: Buffer overflow detected.
+      \end{itemize}
+      \textit{Description:} Indicates that a buffer overflow has occurred during data reception, meaning the receive buffer was full when a new byte arrived. This flag is cleared by reading the \texttt{DATA} register or writing a \texttt{1} to its bit position.
+  \end{itemize}
+  
+  \subsection{Data Register (\texttt{DATA})}
+  \label{sec:data_register}
+  The Data Register (\texttt{DATA}) serves as the primary interface for sending and receiving data through the SPI core.
+  
+  \begin{itemize}
+      \item \textbf{Writing to \texttt{DATA}:}
+      \begin{itemize}
+          \item In \textbf{master mode}, writing a byte to \texttt{DATA} initiates the transmission process. The byte is shifted out via the MOSI line while simultaneously receiving data from the slave through the MISO line.
+          \item In \textbf{slave mode}, writing to \texttt{DATA} prepares the data to be sent to the master during the next communication initiated by the master.
+      \end{itemize}
+      
+      \item \textbf{Reading from \texttt{DATA}:}
+      \begin{itemize}
+          \item Reading from \texttt{DATA} retrieves the most recently received byte of data.
+      \end{itemize}
+      
+      \item Note: DATA is not a physical register. Depending on what mode is configured, it is mapped to other registers as described below.
+
+      \item \textbf{Behavior in Different Modes:}
+      \begin{itemize}
+          \item \textbf{Normal Mode:}
+          \begin{itemize}
+              \item \texttt{DATA} writes go directly to the shift register for immediate transmission.
+              \item \texttt{DATA} reads fetch data from the Receive Data register.
+          \end{itemize}
+          \item \textbf{Buffer Mode:}
+          \begin{itemize}
+              \item \texttt{DATA} writes are stored in the Transmit Data Buffer register, allowing for buffered transmission.
+              \item \texttt{DATA} reads retrieve data from the Receive Data Buffer register, ensuring that multiple received bytes can be handled efficiently.
+          \end{itemize}
+      \end{itemize}
+  \end{itemize}
+  
+  \subsection{Register Addresses}
+  
+  \paragraph{dataWidth: 8}
+  \begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|}
+        \hline
+        \rowcolor{darkgray}  % Dark grey background for header row
+        \textcolor{white}{\textbf{Register Name}} & \textcolor{white}{\textbf{Address Start}} & \textcolor{white}{\textbf{Address End}} \\ \hline
+        CTRLA & 0x0 & 0x0 \\ \hline
+        CTRLB & 0x1 & 0x1 \\ \hline
+        INTCTRL & 0x2 & 0x2 \\ \hline
+        INTFLAGS & 0x3 & 0x3 \\ \hline
+        DATA & 0x4 & 0x4 \\ \hline
+    \end{tabular}
+    \caption{8-bit Register Addressing}
+  \end{table}
+  
+  \paragraph{dataWidth: 16}
+  \begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|}
+      \hline
+      \rowcolor{darkgray}  % Dark grey background for header row
+      \textcolor{white}{\textbf{Register Name}} & \textcolor{white}{\textbf{Address Start}} & \textcolor{white}{\textbf{Address End}} \\ \hline
+      CTRLA & 0x0 & 0x0 \\ \hline
+      CTRLB & 0x1 & 0x1 \\ \hline
+      INTCTRL & 0x2 & 0x2 \\ \hline
+      INTFLAGS & 0x3 & 0x3 \\ \hline
+      DATA & 0x4 & 0x5 \\ \hline
+    \end{tabular}
+    \caption{16-bit Register Addressing}
+  \end{table}
+  
+  \paragraph{dataWidth: 32}
+  \begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|}
+      \hline
+      \rowcolor{darkgray}  % Dark grey background for header row
+      \textcolor{white}{\textbf{Register Name}} & \textcolor{white}{\textbf{Address Start}} & \textcolor{white}{\textbf{Address End}} \\ \hline
+      CTRLA & 0x0 & 0x0 \\ \hline
+      CTRLB & 0x1 & 0x1 \\ \hline
+      INTCTRL & 0x2 & 0x2 \\ \hline
+      INTFLAGS & 0x3 & 0x3 \\ \hline
+      DATA & 0x4 & 0x6 \\ \hline
+    \end{tabular}
+    \caption{32-bit Register Addressing}
+  \end{table}
