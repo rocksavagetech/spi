@@ -1,15 +1,39 @@
 \section{Simulation}
 
 \subsection{Tests}
-The test bench generates a number (default is 50) configurations of the
-DynamicFifo that are highly randomized. There are two flavors of tests:
+The test bench generates a number (default is 2) configurations of the
+SPI that are highly randomized. The user can run the full test-suite  
+with n-configurations using "sbt "test" -DtestName="regression"".
 
-\begin{itemize}
-  \item {Directed tests that fill the FIFO with random data and then read back
-        the results to verify that the read data matches the writted data.}
-  \item {Lengthy random tests that are used to check odd combinations of
-        configurations and to compile code coverage data.}
-\end{itemize}
+User can also run individual tests or test groups by substituting "regression" with
+the relevant test name. A description of the tests is below:
+
+\begin{table}[h]
+  \resizebox{\textwidth}{!}{
+  \centering
+  \begin{tabular}{|c|c|c|c|}
+      \hline
+      \rowcolor{dark-gray}  % Dark grey background for header row
+      \textcolor{white}{\textbf{Test Group Name}} & \textcolor{white}{\textbf{Test Name}} & \textcolor{white}{\textbf{Test Type}} & \textcolor{white}{\textbf{Test Description}} \\ \hline
+      transmitTests & masterMode & Directed & Configures SPI as Master and Tests Transmit w/ Random Data \\ \hline
+      transmitTests & slaveMode & Directed & Configures SPI as Slave and Tests Transmit w/ Random Data \\ \hline
+      transmitTests & fullDuplex & Random & Configures one SPI as Master, other as Slave. Tests transmission w/ Random Data Across all 4 CPOL/CPHA Modes \\ \hline 
+      transmitTests & bitOrder & Directed & Should Transmit and Recieve Random Data Correctly in MSB and LSB modes \\ \hline  
+      clockTests & prescaler & Directed & Clock Speed Test for All Prescaler Values \\ \hline
+      clockTests & doubleSpeed & Directed & Clock Speed Test with Double Speed Enabled \\ \hline
+      interruptTests & txComplete & Directed & Test Transmission Complete Interrupt Flag \\ \hline
+      interruptTests & wcolFlag & Directed & Check if Write Collision Flag is Triggered in Normal Mode \\ \hline
+      interruptTests & dataEmpty & Directed & Check Data Register Empty Flag Triggers in Buffer Mode \\ \hline
+      interruptTests & overFlow & Random & Check Buffer Mode Operation still Continue with Overflow, and Overflow Flag is Set \\ \hline
+      modeTests & bufferTx & Directed & Verify Data is Transmitted and Recieved Correctly in Buffer Mode \\ \hline
+      modeTests & normalRx & Directed & Check Recieve Register Operation in Normal Mode \\ \hline
+      modeTests & daisyChain & Random & Check SPI Operation w/ 1 Master and 2 Slaves in Daisy Chain in Normal Mode \\ \hline
+      modeTests & daisyChainBuffer & Random & Check SPI Operation w/ 1 Master and 2 Slaves in Daisy Chain in Buffer Mode \\ \hline
+    \end{tabular}
+  }
+  \caption{Test Suite}
+\end{table}
+
 
 \subsection{Code coverage}
 All inputs and outputs are checked to insure each toggle at least once. An error
