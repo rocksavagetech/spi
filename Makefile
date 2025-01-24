@@ -2,6 +2,8 @@ MAKEFLAGS += --silent
 	
 SBT = sbt
 
+.PHONY: clean docs update verilog synth sta test
+
 # The Following Vars are set by the development flake:
 # - BUILD_ROOT_RELATIVE
 # - BUILD_ROOT
