@@ -18,7 +18,7 @@ jobs:
         with:
           fetch-depth: 0 # Fetch full history for proper blame tracking
           token: ${{ secrets.REPO_TOKEN }} # Use the token for authentication
-
+          submodules: recursive
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:

@@ -7,7 +7,7 @@ name: Chisel CI
 
 on:
   push:
-    branches: ["main", "nick"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   test:
+    if: ${{ !contains(github.event.head_commit.message, '[gh-bot]') }}
     runs-on: ubuntu-latest
 
     steps:
