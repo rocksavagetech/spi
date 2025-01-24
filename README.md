@@ -1,5 +1,16 @@
 # Chisel Project Template
 
+## Setup
+
+### Git 
+
+```bash
+git clone [url].git
+git submodule update --init --recursive
+touch .git-blame-ignore-revs
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+``` 
+
 ## Development
 
 ### IDE
