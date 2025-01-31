@@ -93,6 +93,7 @@ object modeTests {
 
           dut.clock.step(4)
         }
+        dut.clock.step(8)
         val readReg = readAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U)
         val readInt = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
         require(readReg === slaveData)

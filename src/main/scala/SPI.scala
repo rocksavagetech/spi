@@ -47,11 +47,7 @@ class SPI(p: BaseParams) extends Module {
     io.master.cs := ~(stateReg === masterMode)
     io.slave.miso := 0.U // MISO Off in Master Mode
 
-    when(
-      sclkCounter === (((2.U << (regs.CTRLA(2, 1) * 2.U)) >> (regs.CTRLA(
-        4
-      ))) - 1.U)
-    ) {
+    when(sclkCounter === (((2.U << (regs.CTRLA(2, 1) * 2.U)) >> (regs.CTRLA(4))) - 1.U)) {
       sclkReg := ~sclkReg
       sclkCounter := 0.U
     }.otherwise {
@@ -114,6 +110,7 @@ class SPI(p: BaseParams) extends Module {
             regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Buffer can be overriden now
           }
           writeData := false.B
+          io.master.cs := false.B
           stateReg := masterMode
         }.otherwise {
           stateReg := idle

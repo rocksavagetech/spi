@@ -109,7 +109,7 @@ object transmitTests {
           // Join Both Threads to ensure completion
           masterThread.join()
           slaveThread.join()
-
+          dut.clock.step(8)
           // Assertions to verify data transmission
           val receivedMasterData = readAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U)
           val receivedSlaveData = readAPB(dut.io.slaveApb, dut.master.regs.DATA_ADDR.U)
