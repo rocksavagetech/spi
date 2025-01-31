@@ -2,3 +2,6 @@
 	path = nix
 	url = https://github.com/The-Chiselers/nix.git
 	branch = chisel-5.3.0
+[submodule "shared-config"]
+	path = shared-config
+	url = https://github.com/The-Chiselers/shared-config.git
