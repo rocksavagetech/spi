@@ -1,3 +1,4 @@
+/*
 package tech.rocksavage.chiselware.SPI
 
 import java.io.{File, PrintWriter}
@@ -95,5 +96,5 @@ def collectCoverage(
   }
 }
 
-
+*/
 

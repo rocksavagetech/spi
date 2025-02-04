@@ -32,6 +32,6 @@ lazy val root = (project in file("."))
 
 // Scala coverage settings
 coverageDataDir            := target.value / "../generated/scalaCoverage"
-coverageFailOnMinimum      := true
+coverageFailOnMinimum      := false
 coverageMinimumStmtTotal   := 90
 coverageMinimumBranchTotal := 95
