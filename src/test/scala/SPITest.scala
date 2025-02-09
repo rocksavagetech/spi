@@ -88,7 +88,9 @@ class SpiTest
     val addrWidth = validPAddrWidths(Random.nextInt(validPAddrWidths.length))
 
     // Pass in randomly selected values to DUT
-    val myParams = BaseParams(dataWidth, addrWidth, 8)
+    val myParams = BaseParams(dataWidth, addrWidth, 8, true)
+    val myParamsDaisy = BaseParams(dataWidth, addrWidth, 8, false)
+
 
       info(s"Data Width = $dataWidth")
       info(s"Address Width = $addrWidth")
@@ -216,27 +218,27 @@ class SpiTest
         //Test 8.1: Daisy Chain Test with 3 Slaves
         case "daisyChain" =>
             it should "daisy chain correctly" in {
-            val cov = test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-                modeTests.daisyChain(dut, myParams)
+            val cov = test(new DaisyChainSPI(myParamsDaisy)).withAnnotations(backendAnnotations) { dut =>
+                modeTests.daisyChain(dut, myParamsDaisy)
             }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollection(cov.getAnnotationSeq, myParamsDaisy, testName)
             }
 
         case "daisyChainBuffer" =>
             it should "daisy chain + buffer correctly" in {
-            val cov = test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-                modeTests.daisyChainBuffer(dut, myParams)
+            val cov = test(new DaisyChainSPI(myParamsDaisy)).withAnnotations(backendAnnotations) { dut =>
+                modeTests.daisyChainBuffer(dut, myParamsDaisy)
             }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollection(cov.getAnnotationSeq, myParamsDaisy, testName)
             }
 
         case "modeTests" =>
-            modeTestsFull(myParams)
+            modeTestsFull(myParams, myParamsDaisy)
 
         case "allTests" =>
-            allTests(myParams)
+            allTests(myParams, myParamsDaisy)
 
-        case _ => allTests(myParams)
+        case _ => allTests(myParams, myParamsDaisy)
         }
 
       // Test 6.1: Master Deactivation upon SS Low
@@ -264,12 +266,13 @@ class SpiTest
     //}
 
   def allTests(
-      myParams: BaseParams
+      myParams: BaseParams,
+      myParamsDaisy: BaseParams
   ): Unit = {
     transmitTestsFull(myParams)
     clockTestsFull(myParams)
     interruptTestsFull(myParams)
-    modeTestsFull(myParams)
+    modeTestsFull(myParams, myParamsDaisy)
   }
 
   def transmitTestsFull(
@@ -359,7 +362,8 @@ class SpiTest
   }
 
   def modeTestsFull(
-      myParams: BaseParams
+      myParams: BaseParams,
+      myParamsDaisy: BaseParams
   ): Unit = {
     it should "buffered mode master" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
@@ -377,17 +381,17 @@ class SpiTest
 
 
     it should "daisy chain correctly" in {
-    val cov = test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        modeTests.daisyChain(dut, myParams)
+    val cov = test(new DaisyChainSPI(myParamsDaisy)).withAnnotations(backendAnnotations) { dut =>
+        modeTests.daisyChain(dut, myParamsDaisy)
     }
-    coverageCollection(cov.getAnnotationSeq, myParams, "daisyChain")
+    coverageCollection(cov.getAnnotationSeq, myParamsDaisy, "daisyChain")
     }
 
     it should "daisy chain + buffer correctly" in {
-    val cov = test(new DaisyChainSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
-        modeTests.daisyChainBuffer(dut, myParams)
+    val cov = test(new DaisyChainSPI(myParamsDaisy)).withAnnotations(backendAnnotations) { dut =>
+        modeTests.daisyChainBuffer(dut, myParamsDaisy)
     }
-    coverageCollection(cov.getAnnotationSeq, myParams, "daisyChainBuffer")
+    coverageCollection(cov.getAnnotationSeq, myParamsDaisy, "daisyChainBuffer")
     }
   }
 

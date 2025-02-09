@@ -234,6 +234,32 @@ class SPI(p: BaseParams) extends Module {
     }
   }
 
+    // Collect code coverage points
+  if (p.coverage) {
+    // Count clock ticks to allow for coverage computation
+    val tick = true.B
+    for (bit <- 0 to p.dataWidth - 1) {
+      cover(io.apb.PRDATA(bit)).suggestName(s"apb_PRDATA_$bit")
+      cover(io.apb.PWDATA(bit)).suggestName(s"apb_PWDATA_$bit")
+    }
+    for (bit <- 0 to p.addrWidth - 1)
+      cover(io.apb.PADDR(bit)).suggestName(s"apb_ADDR_$bit")
+    cover(tick).suggestName("tick")
+    cover(io.apb.PSEL).suggestName("io__PSEL")
+    cover(io.apb.PENABLE).suggestName("io__PENABLE")
+    cover(io.apb.PWRITE).suggestName("io__PWRITE")
+    cover(io.apb.PREADY).suggestName("io__PREADY")
+    cover(io.apb.PSLVERR).suggestName("io__PSLVERR")
+    cover(io.master.sclk).suggestName(s"io_m_sclk")
+    cover(io.master.miso).suggestName(s"io_m_miso")
+    cover(io.master.mosi.asBool).suggestName(s"io_m_mosi")
+    cover(io.master.cs).suggestName(s"io_m_cs")
+    cover(io.slave.sclk).suggestName(s"io_s_sclk")
+    cover(io.slave.miso).suggestName(s"io_s_miso")
+    cover(io.slave.mosi.asBool).suggestName(s"io_s_mosi")
+    cover(io.slave.cs).suggestName(s"io_s_cs")
+  }
+
   def registerWrite(addr: UInt): Unit = {
     // Probably need all regs except DATA to be locked to 1 Byte
     when(addr >= regs.CTRLA_ADDR.U && addr <= regs.CTRLA_ADDR_MAX.U) {

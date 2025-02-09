@@ -65,4 +65,5 @@ class DaisyChainSPI(p: BaseParams) extends Module {
   //slave3.io.master.miso := 0.U
   master.io.slave.cs := false.B
   master.io.slave.sclk := false.B
+  
 }
