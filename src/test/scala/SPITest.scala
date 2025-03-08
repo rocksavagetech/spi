@@ -14,8 +14,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 //import tech.rocksavage.chiselware.util.TestUtils.{randData, checkCoverage}
-import TestUtils.checkCoverage
-import TestUtils.randData
+//import TestUtils.checkCoverage
+//import TestUtils.randData
 import chisel3._
 import chisel3.util._
 import chiseltest._
@@ -24,6 +24,7 @@ import chiseltest.simulator._
 import firrtl2.AnnotationSeq
 import firrtl2.annotations.Annotation // Correct Annotation type for firrtl2
 import firrtl2.options.TargetDirAnnotation
+import tech.rocksavage.test._
 
 /** Highly randomized test suite driven by configuration parameters. Includes
   * code coverage for all top-level ports. Inspired by the DynamicFifo
@@ -80,7 +81,8 @@ class SpiTest
 
   def main(testName: String): Unit = {
     behavior of testName
-
+    val covDir   = "./out/cov"
+    val coverage = true
     // Randomize Input Variables
     val validDataWidths = Seq(8, 16, 32)
     val validPAddrWidths = Seq(8, 16, 32)
@@ -90,6 +92,7 @@ class SpiTest
     // Pass in randomly selected values to DUT
     val myParams = BaseParams(dataWidth, addrWidth, 8, true)
     val myParamsDaisy = BaseParams(dataWidth, addrWidth, 8, false)
+    val configName = dataWidth + "_" + addrWidth + "_8"
 
 
       info(s"Data Width = $dataWidth")
@@ -103,7 +106,13 @@ class SpiTest
             val cov = test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 transmitTests.masterMode(dut, myParams)
             }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         // Test case for Slave Mode Initialization
@@ -112,7 +121,13 @@ class SpiTest
                 val cov = test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 transmitTests.slaveMode(dut, myParams)
             }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         // Test 2.1: Full Duplex Transmission (Master-Slave) for all SPI Modes with Randomized DataWidth
@@ -121,7 +136,13 @@ class SpiTest
             val cov =  test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 transmitTests.fullDuplex(dut, myParams)
             }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         // Test 2.2: MSB First and LSB First Data Order
@@ -130,11 +151,17 @@ class SpiTest
             val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 transmitTests.bitOrder(dut, myParams)
             }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         case "transmitTests" =>
-            transmitTestsFull(myParams)
+            transmitTestsFull(myParams, configName, covDir, coverage)
 
         // 3.1 Clock Speed Tests
         case "prescaler" =>
@@ -142,7 +169,13 @@ class SpiTest
             val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 clockTests.prescaler(dut, myParams)
                 }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         // Test 3.2: Double-Speed Master SPI Mode
@@ -151,11 +184,17 @@ class SpiTest
             val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 clockTests.doubleSpeed(dut, myParams)
                 }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         case "clockTests" =>
-            clockTestsFull(myParams)
+            clockTestsFull(myParams, configName, covDir, coverage)
 
         // Test 4.1: Transmission Complete Interrupt Flag
         case "txComplete" =>
@@ -163,7 +202,13 @@ class SpiTest
             val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 interruptTests.txComplete(dut, myParams)
                 }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         // Test 4.2: Write Collision Flag
@@ -172,7 +217,13 @@ class SpiTest
             val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 interruptTests.wcolFlag(dut, myParams)
                 }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         // Test 4.3: Data Register Empty Interrupt
@@ -181,7 +232,13 @@ class SpiTest
             val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 interruptTests.dataEmpty(dut, myParams)
                 }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         case "overFlow" =>
@@ -189,11 +246,17 @@ class SpiTest
             val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 interruptTests.overFlow(dut, myParams)
                 }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         case "interruptTests" =>
-            interruptTestsFull(myParams)
+            interruptTestsFull(myParams, configName, covDir, coverage)
 
         // Test 7.2: Buffered Mode Master
         // Enable Buffered Mode and check that multiple bytes can be written to the transmit buffer before the transfer completes.
@@ -203,7 +266,13 @@ class SpiTest
             val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 modeTests.bufferTx(dut, myParams)
                 }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         // Test 7.3: Recieve Register Check Normal Mode
@@ -212,7 +281,13 @@ class SpiTest
             val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
                 modeTests.normalRx(dut, myParams)
                 }
-            coverageCollection(cov.getAnnotationSeq, myParams, testName)
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
             }
 
         //Test 8.1: Daisy Chain Test with 3 Slaves
@@ -221,7 +296,13 @@ class SpiTest
             val cov = test(new DaisyChainSPI(myParamsDaisy)).withAnnotations(backendAnnotations) { dut =>
                 modeTests.daisyChain(dut, myParamsDaisy)
             }
-            coverageCollection(cov.getAnnotationSeq, myParamsDaisy, testName)
+            coverageCollector.collectCoverage(
+                cov.getAnnotationSeq,
+                testName,
+                configName,
+                false,
+                covDir
+            )
             }
 
         case "daisyChainBuffer" =>
@@ -229,16 +310,22 @@ class SpiTest
             val cov = test(new DaisyChainSPI(myParamsDaisy)).withAnnotations(backendAnnotations) { dut =>
                 modeTests.daisyChainBuffer(dut, myParamsDaisy)
             }
-            coverageCollection(cov.getAnnotationSeq, myParamsDaisy, testName)
+            coverageCollector.collectCoverage(
+                cov.getAnnotationSeq,
+                testName,
+                configName,
+                false,
+                covDir
+            )
             }
 
         case "modeTests" =>
-            modeTestsFull(myParams, myParamsDaisy)
+            modeTestsFull(myParams, myParamsDaisy, configName, covDir, coverage)
 
         case "allTests" =>
-            allTests(myParams, myParamsDaisy)
+            allTests(myParams, myParamsDaisy, configName, covDir, coverage)
 
-        case _ => allTests(myParams, myParamsDaisy)
+        case _ => allTests(myParams, myParamsDaisy, configName, covDir, coverage)
         }
 
       // Test 6.1: Master Deactivation upon SS Low
@@ -257,7 +344,7 @@ class SpiTest
       // Enable Buffered Mode in Slave mode and verify that multiple received bytes are stored in the FIFO and transmitted correctly.
 
         it should "generate cumulative coverage report" in {
-        coverageCollector.saveCumulativeCoverage(myParams)
+        coverageCollector.saveCumulativeCoverage(coverage, covDir)
         }
     }
 
@@ -267,116 +354,203 @@ class SpiTest
 
   def allTests(
       myParams: BaseParams,
-      myParamsDaisy: BaseParams
+      myParamsDaisy: BaseParams,
+      configName: String,
+      covDir: String,
+      coverage: Boolean
   ): Unit = {
-    transmitTestsFull(myParams)
-    clockTestsFull(myParams)
-    interruptTestsFull(myParams)
-    modeTestsFull(myParams, myParamsDaisy)
+    transmitTestsFull(myParams, configName, covDir, coverage)
+    clockTestsFull(myParams, configName, covDir, coverage)
+    interruptTestsFull(myParams, configName, covDir, coverage)
+    modeTestsFull(myParams, myParamsDaisy, configName, covDir, coverage)
   }
 
   def transmitTestsFull(
-      myParams: BaseParams
+    myParams: BaseParams,
+    configName: String,
+    covDir: String,
+    coverage: Boolean
   ): Unit = {
 
     it should "initialize the SPI core in Master Mode correctly" in {
     val cov = test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         transmitTests.masterMode(dut, myParams)
     }
-    coverageCollection(cov.getAnnotationSeq, myParams, "masterMode")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "masterMode",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
     it should "initialize the SPI core in Slave Mode correctly" in {
         val cov = test(new SPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         transmitTests.slaveMode(dut, myParams)
     }
-    coverageCollection(cov.getAnnotationSeq, myParams, "slaveMode")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "slaveMode",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
     it should "transmit and receive data correctly in Full Duplex mode (Master-Slave) for all SPI modes" in {
     val cov =  test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         transmitTests.fullDuplex(dut, myParams)
     }
-    coverageCollection(cov.getAnnotationSeq, myParams, "fullDuplex")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "fullDuplex",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
     it should "transmit and receive data correctly in MSB and LSB first modes" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         transmitTests.bitOrder(dut, myParams)
     }
-    coverageCollection(cov.getAnnotationSeq, myParams, "bitOrder")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "bitOrder",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
   }
 
   def clockTestsFull(
-      myParams: BaseParams
+    myParams: BaseParams,
+    configName: String,
+    covDir: String,
+    coverage: Boolean
   ): Unit = {
 
     it should "clock speed test for prescalar 0x2(64 times slower)" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         clockTests.prescaler(dut, myParams)
         }
-    coverageCollection(cov.getAnnotationSeq, myParams, "prescaler")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "prescaler",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
     it should "clock speed for clk2x with prescalar of 8 times slower" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         clockTests.doubleSpeed(dut, myParams)
         }
-    coverageCollection(cov.getAnnotationSeq, myParams, "doubleSpeed")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "doubleSpeed",
+        configName,
+        coverage,
+        covDir
+      )
     }
   }
 
   def interruptTestsFull(
-      myParams: BaseParams
+    myParams: BaseParams,
+    configName: String,
+    covDir: String,
+    coverage: Boolean
   ): Unit = {
 
     it should "transmission complete interrupt flag" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         interruptTests.txComplete(dut, myParams)
         }
-    coverageCollection(cov.getAnnotationSeq, myParams, "txComplete")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "txComplete",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
     it should "write collision flag" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         interruptTests.wcolFlag(dut, myParams)
         }
-    coverageCollection(cov.getAnnotationSeq, myParams, "wcolFLag")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "wcolFlag",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
     it should "data register empty interrupt flag" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         interruptTests.dataEmpty(dut, myParams)
         }
-    coverageCollection(cov.getAnnotationSeq, myParams, "dataEmpty")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "dataEmpty",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
     it should "cause buffer overflow flag" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         interruptTests.overFlow(dut, myParams)
         }
-    coverageCollection(cov.getAnnotationSeq, myParams, "overFlow")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "overFlow",
+        configName,
+        coverage,
+        covDir
+      )
     }
   }
 
   def modeTestsFull(
       myParams: BaseParams,
-      myParamsDaisy: BaseParams
+      myParamsDaisy: BaseParams,
+      configName: String,
+      covDir: String,
+      coverage: Boolean
   ): Unit = {
     it should "buffered mode master" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         modeTests.bufferTx(dut, myParams)
         }
-    coverageCollection(cov.getAnnotationSeq, myParams, "bufferTx")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "bufferTx",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
     it should "recieve register correct normal mode" in {
     val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
         modeTests.normalRx(dut, myParams)
         }
-    coverageCollection(cov.getAnnotationSeq, myParams, "normalRx")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "normalRx",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
 
@@ -384,50 +558,26 @@ class SpiTest
     val cov = test(new DaisyChainSPI(myParamsDaisy)).withAnnotations(backendAnnotations) { dut =>
         modeTests.daisyChain(dut, myParamsDaisy)
     }
-    coverageCollection(cov.getAnnotationSeq, myParamsDaisy, "daisyChain")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "daisyChain",
+        configName,
+        coverage,
+        covDir
+      )
     }
 
     it should "daisy chain + buffer correctly" in {
     val cov = test(new DaisyChainSPI(myParamsDaisy)).withAnnotations(backendAnnotations) { dut =>
         modeTests.daisyChainBuffer(dut, myParamsDaisy)
     }
-    coverageCollection(cov.getAnnotationSeq, myParamsDaisy, "daisyChainBuffer")
-    }
-  }
-
-
-  def coverageCollection(
-    cov: Seq[Annotation],
-    myParams: BaseParams,
-    testName: String
-    ): Unit = {
-    if (myParams.coverage) {
-      val coverage = cov
-        .collectFirst { case a: TestCoverage => a.counts }
-        .get
-        .toMap
-
-      val testConfig =
-        myParams.addrWidth.toString + "_" + myParams.dataWidth.toString
-
-      val buildRoot = sys.env.get("BUILD_ROOT")
-      if (buildRoot.isEmpty) {
-        println("BUILD_ROOT not set, please set and run again")
-        System.exit(1)
-      }
-      // path join
-      val scalaCoverageDir = new File(buildRoot.get + "/cov/scala")
-      val verCoverageDir = new File(buildRoot.get + "/cov/verilog")
-      verCoverageDir.mkdirs()
-      val coverageFile = verCoverageDir.toString + "/" + testName + "_" +
-        testConfig + ".cov"
-
-      val stuckAtFault = checkCoverage(coverage, coverageFile)
-      if (stuckAtFault)
-        println(
-          s"WARNING: At least one IO port did not toggle -- see $coverageFile"
-        )
-      info(s"Verilog Coverage report written to $coverageFile")
+    coverageCollector.collectCoverage(
+        cov.getAnnotationSeq,
+        "daisyChainBuffer",
+        configName,
+        coverage,
+        covDir
+      )
     }
   }
 }

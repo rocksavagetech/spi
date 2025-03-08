@@ -1,6 +1,7 @@
 \section{Theory of Operations}
 
-The SPI (Serial Peripheral Interface) core is equipped with a variety of features that make it a versatile and efficient choice for synchronous serial communication in embedded systems. Below is a detailed list of its key features:
+The SPI (Serial Peripheral Interface) core is equipped with a variety of features that make it a versatile and efficient choice for synchronous serial communication in embedded systems. These features
+are described in-depth in the Register Interface section, but here is a brief overview:
 
 \begin{itemize}
     \item \textbf{Full Duplex, Three-Wire Synchronous Data Transfer:} Enables simultaneous transmission and reception of data, enhancing communication efficiency.
@@ -21,23 +22,31 @@ The SPI (Serial Peripheral Interface) core is equipped with a variety of feature
     \label{fig:spi_block_diagram}
 \end{figure}
 
-\subsection{Overview}
-The Serial Peripheral Interface (SPI) core is a robust and high-speed synchronous communication protocol widely used in embedded systems. It facilitates reliable data exchange between a central controller (master) and various peripheral devices (slaves) such as sensors, memory modules, and other microcontrollers. The SPI core's flexibility in operating modes and data transfer configurations makes it suitable for a broad range of applications, from simple data logging to complex sensor networks.
+\subsection{Interface Timing}
 
-Key aspects of the SPI core include:
-\begin{itemize}
-    \item \textbf{High-Speed Data Transfer:} SPI supports fast data rates, making it ideal for applications requiring rapid data exchange.
-    \item \textbf{Full-Duplex Communication:} Allows simultaneous sending and receiving of data, optimizing communication efficiency.
-    \item \textbf{Simple Hardware Interface:} Utilizes minimal wiring (typically three or four lines), reducing hardware complexity and saving valuable board space.
-    \item \textbf{Scalability:} Can connect multiple slave devices to a single master, enabling scalable system designs.
-\end{itemize}
+Spi has a synchronous Apb3 interface, and a Spi interface. The timing diagram shown below
+in Figure~\ref{fig:timing} represents an instantiation with the following
+parameters.
 
-\subsection{Use Cases}
-The SPI core is employed in various scenarios, including:
-\begin{itemize}
-    \item \textbf{Interfacing with Sensors:} Communicates with high-precision sensors in automotive, industrial, and consumer electronics.
-    \item \textbf{Memory Devices:} Interfaces with flash memory, EEPROMs, and other storage modules for data retention.
-    \item \textbf{Display Modules:} Drives LCD, OLED, and other display technologies requiring efficient data streaming.
-    \item \textbf{Communication Modules:} Connects with wireless modules like Bluetooth and Wi-Fi for data transmission.
-\end{itemize}
+\begin{lstlisting}[language=Scala]
+    val mySpi = new Spi(
+      dataWidth = 8, 
+      addrWidth = 8 ) 
+\end{lstlisting}
+    
+\begin{figure}[h]
+    \includegraphics[width=\textwidth]{images/wavedrom.png}
+    \caption{Timing Diagram}\label{fig:timing}
+  \end{figure}
+
+This shows the operation of enabling the Spi as a Master following the Apb protocol. Register CTRLA is written to configure the Master
+as MSB first, prescaler set at 4, and no double clock speed. Since CTRLB is not written to, and its default values are 0, there will be no buffer mode, 
+and CPOL/CPHA mode set to 0. The DATA register is written with 0xA5, which is the data the Master will transmit to the Slave. 
+
+The \textit{sclk} port is driven once the master is enabled via CTRLA. Since CPOL/CPHA is set to 0, \textit{sclk} begins low, and sampling happens on the rising edge.
+\textit{mosi} shifts out the value written to DATA, one bit at a time, MSB first. \textit{miso} stays low since the Slave is not sending any data to the Master. \textit{cs} 
+is driven low once transmission begins, signalling to the Slave that a transaction is occuring.
+
+Once the transaction is complete, all the SPI ports go low. 
+
 
