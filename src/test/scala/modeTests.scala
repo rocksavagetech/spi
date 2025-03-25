@@ -159,7 +159,7 @@ object modeTests {
           require(readRegM === masterData1) 
     }
 
-      def daisyChainBuffer(
+    def daisyChainBuffer(
         dut: DaisyChainSPI,
         myParams: BaseParams
     ): Unit = {   

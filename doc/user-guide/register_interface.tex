@@ -115,8 +115,8 @@ When programming registers, each register starts on a byte address, and the last
       \caption{Control Register B (\texttt{CTRLB})}
       \begin{tabular}{@{}cccccccc@{}}
           \toprule
-          \textbf{Bit} & 7 & 6 & 5 & 4 & 3 & 2 & 1-0 \\ \midrule
-          \textbf{Name} & BUFEN & N/A & N/A & N/A & N/A & N/A & MODE[1:0] \\ \bottomrule
+          \textbf{Bit} & 7 & 6 & 5 & 4 & 3-2 & 1-0 \\ \midrule
+          \textbf{Name} & BUFEN & N/A & N/A & N/A & EIGHTB[3:2] & MODE[1:0] \\ \bottomrule
       \end{tabular}
       \label{tab:ctrl_b}
   \end{table}
@@ -130,6 +130,15 @@ When programming registers, each register starts on a byte address, and the last
       \end{itemize}
       \textit{Description:} When set, enables buffer mode, allowing the SPI core to handle multiple data bytes efficiently through additional buffering mechanisms.
       
+      \item \textbf{Bits 3-2 - EIGHTB[3:2] (8 Bit Transactions):} 
+      \begin{itemize}
+          \item \texttt{00}: Data is not split into 8-bit transactions.
+          \item \texttt{01}: Used for 16-bit configuration to split into 8-bit transactions.
+          \item \texttt{10}: User for 32-bit configuration to split into 8-bit transactions.
+          \item \texttt{11}: N/A.
+      \end{itemize}
+      \textit{Description:} Used to split 16-bit and 32-bit into 8-bit transactions. Note: Must be 00 for an 8-bit core.
+
       \item \textbf{Bits 1-0 - MODE[1:0] (Mode Selection):} 
       \begin{itemize}
           \item \texttt{00}: Mode 0.
@@ -232,8 +241,8 @@ When programming registers, each register starts on a byte address, and the last
       
       \item \textbf{Bit 5 - DREIF (Data Register Empty Interrupt Flag):} 
       \begin{itemize}
-          \item \texttt{0}: \texttt{DATA} register not ready for new data.
-          \item \texttt{1}: \texttt{DATA} register is ready to accept new data.
+          \item \texttt{0}: \texttt{DATA} register is ready to accept new data.
+          \item \texttt{1}: \texttt{DATA} register not ready for new data.
       \end{itemize}
       \textit{Description:} Indicates that the \texttt{DATA} register is empty and ready to receive new data for transmission. Writing new data to \texttt{DATA} clears this flag, either by writing the data or disabling the interrupt.
       

@@ -41,6 +41,7 @@ class SPI(p: BaseParams) extends Module {
   val recieveBuffer = RegInit(0.U(p.dataWidth.W))
   /** Register to hold the most recently received data. */
   val recieveReg = RegInit(0.U(p.dataWidth.W)) // Receive has one reg buffer even in Normal Mode
+  val dataOrder = RegInit(0.U(2.W))
 
   // State Machine Initialization
   /** Enumeration for SPI state machine states. */
@@ -79,8 +80,8 @@ class SPI(p: BaseParams) extends Module {
         sclkCounter := sclkCounter + 1.U
       }
     //}
-    io.master.sclk := Mux(transitionCounter <= ((p.dataWidth << 1).U),
-    sclkReg, 
+    io.master.sclk := Mux(transitionCounter <= ((p.dataWidth.U >> regs.CTRLB(3, 2)) << 1.U),
+    sclkReg,
     !((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
     )
     }.otherwise {
@@ -127,6 +128,7 @@ class SPI(p: BaseParams) extends Module {
     is(idle) {
       shiftCounter := 0.U
       transitionCounter := 0.U
+      dataOrder := Mux(p.dataWidth.U === 32.U, regs.CTRLB(3, 2) + 1.U, regs.CTRLB(3, 2))
       when(regs.CTRLA(5) === 1.U) { // Master Mode
         io.master.sclk := !((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))        
         sclkReg := !((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b01".U))
@@ -158,7 +160,7 @@ class SPI(p: BaseParams) extends Module {
       prevClk := sclkReg
       when((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U)) { // Sample on Rising Edge
         when(~prevClk & sclkReg) {
-          when(shiftCounter < (p.dataWidth).U) {
+          when(shiftCounter < (p.dataWidth.U >> regs.CTRLB(3, 2))) {
             when(regs.CTRLA(6) === 1.U) {
               spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
               printf("MASTER TRANSMIT: %x\n", spiShift(0))
@@ -175,7 +177,7 @@ class SPI(p: BaseParams) extends Module {
         }
       }.otherwise {
         when(prevClk & ~sclkReg) { // Sample on Falling Edge
-          when(shiftCounter < (p.dataWidth).U) {
+          when(shiftCounter < (p.dataWidth.U >> regs.CTRLB(3, 2))) {
             when(regs.CTRLA(6) === 1.U) {
               spiShift := io.master.miso ## spiShift(p.dataWidth - 1, 1)
               printf("MASTER TRANSMIT: %x\n", spiShift(0))
@@ -199,7 +201,7 @@ class SPI(p: BaseParams) extends Module {
       }
       when((regs.CTRLB(1, 0) === "b00".U) || (regs.CTRLB(1, 0) === "b11".U)) { // Sample on Rising Edge
         when(~prevClk & io.slave.sclk) {
-          when(shiftCounter < (p.dataWidth).U) {
+          when(shiftCounter < (p.dataWidth.U >> regs.CTRLB(3, 2))) {
             when(regs.CTRLA(6) === 1.U) {
               spiShift := io.slave.mosi ## spiShift(p.dataWidth - 1, 1)
               printf("SLAVE TRANSMIT: %x\n", spiShift(0))
@@ -215,7 +217,7 @@ class SPI(p: BaseParams) extends Module {
         }
       }.otherwise {
         when(prevClk & ~io.slave.sclk) { // Sample on Falling Edge
-          when(shiftCounter < (p.dataWidth).U) {
+          when(shiftCounter < (p.dataWidth.U >> regs.CTRLB(3, 2))) {
             when(regs.CTRLA(6) === 1.U) {
               spiShift := io.slave.mosi ## spiShift(p.dataWidth - 1, 1)
               printf("SLAVE TRANSMIT: %x\n", spiShift(0))
@@ -246,17 +248,19 @@ class SPI(p: BaseParams) extends Module {
         regs.INTFLAGS := regs.INTFLAGS | (1.U << 7.U) // Set it
       }
 
-      when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U) { // In Buffer mode, when transmit buffer still has data
+      when(regs.CTRLB(7) === 1.U && regs.INTFLAGS(5) === 1.U && dataOrder === 0.U) { // In Buffer mode, when transmit buffer still has data
         spiShift := transmitBuffer
+        dataOrder := Mux(p.dataWidth.U === 32.U, regs.CTRLB(3, 2) + 1.U, regs.CTRLB(3, 2))
         regs.INTFLAGS := regs.INTFLAGS & ~(1.U << 5.U) // Unlock buffer
         writeData := false.B
-        when(regs.CTRLA(5) === 1.U) {
-          stateReg := masterMode // Even in bufferMode, still need to go to complete state to save data in recieveReg
-        }.otherwise {
-          stateReg := slaveMode
-        }
+        stateReg := Mux(regs.CTRLA(5) === 1.U, masterMode, slaveMode)
       }.otherwise {
-        stateReg := idle
+        when(dataOrder =/= 0.U) {
+          dataOrder := dataOrder - 1.U
+          stateReg := Mux(regs.CTRLA(5) === 1.U, masterMode, slaveMode)
+        }.otherwise {
+          stateReg := idle
+        }
       }
     }
   }

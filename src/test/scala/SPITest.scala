@@ -86,7 +86,7 @@ class SpiTest
     // Randomize Input Variables
     val validDataWidths = Seq(8, 16, 32)
     val validPAddrWidths = Seq(8, 16, 32)
-    val dataWidth = 8 // validDataWidths(Random.nextInt(validDataWidths.length))
+    val dataWidth = 16 // validDataWidths(Random.nextInt(validDataWidths.length))
     val addrWidth = validPAddrWidths(Random.nextInt(validPAddrWidths.length))
 
     // Pass in randomly selected values to DUT
@@ -160,6 +160,33 @@ class SpiTest
             )
             }
 
+          case "dataOrder" =>
+            it should "partition 16-bit data into two 8-bit transactions" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                transmitTests.dataOrder(dut, myParams)
+                }
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
+            }
+
+          case "dataOrderBuffer" =>
+            it should "partition 16-bit data into two 8-bit transactions with buffer mode enabled" in {
+            val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+                transmitTests.dataOrderBuffer(dut, myParams)
+                }
+            coverageCollector.collectCoverage(
+              cov.getAnnotationSeq,
+              testName,
+              configName,
+              coverage,
+              covDir
+            )
+            }
         case "transmitTests" =>
             transmitTestsFull(myParams, configName, covDir, coverage)
 
@@ -422,6 +449,32 @@ class SpiTest
         coverage,
         covDir
       )
+    }
+
+    it should "partition 16-bit data into two 8-bit transactions" in {
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        transmitTests.dataOrder(dut, myParams)
+    }
+    coverageCollector.collectCoverage(
+      cov.getAnnotationSeq,
+      testName,
+      configName,
+      coverage,
+      covDir
+    )
+    }
+
+    it should "partition 16-bit data into two 8-bit transactions with buffer mode enabled" in {
+    val cov = test(new FullDuplexSPI(myParams)).withAnnotations(backendAnnotations) { dut =>
+        transmitTests.dataOrderBuffer(dut, myParams)
+        }
+    coverageCollector.collectCoverage(
+      cov.getAnnotationSeq,
+      testName,
+      configName,
+      coverage,
+      covDir
+    )
     }
 
   }
