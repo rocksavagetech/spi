@@ -22,7 +22,8 @@ object clockTests {
         // Set up Master to transmit and Slave to receive
         writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
         writeAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U, slaveData.U)
-
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100000".U) // Enable Master in Master mode
+        dut.clock.step(128)
         // Enable both Master and Slave
         writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLA_ADDR.U, "b00000001".U) // Set Slave
         writeAPB(dut.io.masterApb, dut.master.regs.CTRLA_ADDR.U, "b00100101".U) // Set Master in Master mode, DIV64
@@ -37,6 +38,7 @@ object clockTests {
             dut.io.slave.miso.expect(slaveBit.B)
             dut.clock.step(64)
         }
+        dut.clock.step(256)
     }
 
     def doubleSpeed(
