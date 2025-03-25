@@ -10,8 +10,17 @@ Test / parallelExecution := false
 val chiselVersion   = "6.6.0"
 val scalafmtVersion = "2.5.0"
 
+lazy val chisel_module_runner = RootProject(
+  uri("https://github.com/The-Chiselers/chisel_module_runner.git#main"),
+)
+lazy val stdlib = RootProject(
+  uri("https://github.com/The-Chiselers/stdlib.git#main"),
+)
+lazy val synth = RootProject(
+  uri("https://github.com/The-Chiselers/synth.git#main"),
+)
 lazy val test_utils = RootProject(
-  uri("https://github.com/The-Chiselers/test_utils.git#main")
+  uri("https://github.com/The-Chiselers/test_utils.git#main"),
 )
 
 lazy val root = (project in file("."))
@@ -34,8 +43,11 @@ lazy val root = (project in file("."))
     ),
     coverageExcludedFiles := ".*GenVerilog;.*BaseParams;.*Interfaces"
   ).dependsOn(
-    test_utils
-  )
+      chisel_module_runner,
+      stdlib,
+      synth,
+      test_utils,
+    )
 
 // Scala coverage settings
 coverageDataDir            := target.value
