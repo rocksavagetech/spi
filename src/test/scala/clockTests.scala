@@ -38,7 +38,7 @@ object clockTests {
             dut.io.slave.miso.expect(slaveBit.B)
             dut.clock.step(64)
         }
-        dut.clock.step(256)
+        //dut.clock.step(256)
     }
 
     def doubleSpeed(

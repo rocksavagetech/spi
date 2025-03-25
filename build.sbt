@@ -41,7 +41,7 @@ lazy val root = (project in file("."))
     addCompilerPlugin(
       "org.chipsalliance" % "chisel-plugin" % "6.6.0" cross CrossVersion.full
     ),
-    coverageExcludedFiles := ".*GenVerilog;.*BaseParams;.*Interfaces"
+    coverageExcludedFiles := ".*GenVerilog;.*BaseParams;.*Interfaces;.*SpiConfig"
   ).dependsOn(
       chisel_module_runner,
       stdlib,

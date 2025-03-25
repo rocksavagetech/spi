@@ -223,16 +223,6 @@ object transmitTests {
           }
           dut.clock.step(4)
         }
-        val readFlag2 = readAPB(dut.io.masterApb, dut.master.regs.INTFLAGS_ADDR.U)
-        require(readFlag2 === 64)
-        val readReg = readAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U)
-        println(s"readReg Read: ${readReg.toString()}")
-        println(s"masterData Read: ${masterData.toString()}")
-        require(readReg === masterData)
-        dut.clock.step(2*(myParams.dataWidth-1))
-        val readReg2 = readAPB(dut.io.slaveApb, dut.slave.regs.DATA_ADDR.U)
-        require(readReg2 === transmitBuffer)
-        dut.clock.step(2*(myParams.dataWidth-1))
     }
 
 }

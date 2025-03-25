@@ -19,6 +19,8 @@ the relevant test name. A description of the tests is below:
       transmitTests & slaveMode & Directed & Configures SPI as Slave and Tests Transmit w/ Random Data \\ \hline
       transmitTests & fullDuplex & Random & Configures one SPI as Master, other as Slave. Tests transmission w/ Random Data Across all 4 CPOL/CPHA Modes \\ \hline 
       transmitTests & bitOrder & Directed & Should Transmit and Recieve Random Data Correctly in MSB and LSB modes \\ \hline  
+      transmitTests & dataOrder & Directed & Should partition 16-bit data into two 8-bit transactions \\ \hline
+      transmitTests & dataOrderBuffer & Random & Should partition 16-bit data into two 8-bit transactions with buffer enabled \\ \hline
       clockTests & prescaler & Directed & Clock Speed Test for All Prescaler Values \\ \hline
       clockTests & doubleSpeed & Directed & Clock Speed Test with Double Speed Enabled \\ \hline
       interruptTests & txComplete & Directed & Test Transmission Complete Interrupt Flag \\ \hline
@@ -35,7 +37,7 @@ the relevant test name. A description of the tests is below:
 \end{table}
 
 \subsection{Toggle Coverage}
-Current Score: 81.82\%
+Current Score: 87.32\%
 
 All inputs and outputs are checked to insure each toggle at least once. If coverage is enabled
 during core instantiation, a cumulative coverage report of all tests is generated under ./out/cov/verliog.
@@ -45,7 +47,7 @@ which are intended to be static during each simulation. These signals are
 excluded from coverage checks.
 
 \subsection{Code Coverage}
-Current Score: 94.23\%
+Current Score: 94.37\%
 
 Code coverage for all tests can be generated as follows:
 \begin{verbatim}
