@@ -194,8 +194,8 @@ object transmitTests {
         // Generate random data for Master and Slave according to the randomized myParams.dataWidth
         val masterData = BigInt(myParams.dataWidth, Random)  // Randomized data for master
         val slaveData = BigInt(myParams.dataWidth, Random)   // Randomized data for slave
-        writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10010100".U) // Enable Buffer Mode. Needs to be done BEFORE writing data
-        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLB_ADDR.U, "b10010100".U) // Enable Buffer Mode for slave too
+        writeAPB(dut.io.masterApb, dut.master.regs.CTRLB_ADDR.U, "b10000100".U) // Enable Buffer Mode. Needs to be done BEFORE writing data
+        writeAPB(dut.io.slaveApb, dut.slave.regs.CTRLB_ADDR.U, "b10000100".U) // Enable Buffer Mode for slave too
 
         // Set up Master to transmit and Slave to receive
         writeAPB(dut.io.masterApb, dut.master.regs.DATA_ADDR.U, masterData.U)
