@@ -255,7 +255,7 @@ class SPI(p: BaseParams) extends Module {
         writeData := false.B
         stateReg := Mux(regs.CTRLA(5) === 1.U, masterMode, slaveMode)
       }.otherwise {
-        when(dataOrder =/= 0.U) {
+        when((dataOrder =/= 0.U) && (regs.CTRLB(4) === 0.U)) {
           dataOrder := dataOrder - 1.U
           stateReg := Mux(regs.CTRLA(5) === 1.U, masterMode, slaveMode)
         }.otherwise {

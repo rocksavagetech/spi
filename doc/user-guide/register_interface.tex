@@ -116,7 +116,7 @@ When programming registers, each register starts on a byte address, and the last
       \begin{tabular}{@{}cccccccc@{}}
           \toprule
           \textbf{Bit} & 7 & 6 & 5 & 4 & 3-2 & 1-0 \\ \midrule
-          \textbf{Name} & BUFEN & N/A & N/A & N/A & EIGHTB[3:2] & MODE[1:0] \\ \bottomrule
+          \textbf{Name} & BUFEN & N/A & N/A & EIGHTO & EIGHTB[3:2] & MODE[1:0] \\ \bottomrule
       \end{tabular}
       \label{tab:ctrl_b}
   \end{table}
@@ -130,14 +130,21 @@ When programming registers, each register starts on a byte address, and the last
       \end{itemize}
       \textit{Description:} When set, enables buffer mode, allowing the SPI core to handle multiple data bytes efficiently through additional buffering mechanisms.
       
+      \item \textbf{Bit 4 - EIGHTO (8 Bit Only):} 
+      \begin{itemize}
+          \item \texttt{0}: Data is shifted as normal.
+          \item \texttt{1}: Data is forced to only shift upper 8-bits or lower 8-bits (depending on CTRLA DORD configuartion)
+      \end{itemize}
+      \textit{Description:} Useful for 16 or 32-bit cores to only shift 8 bits. Can only be used during Normal mode - disable this if you wish to use buffer mode.
+
       \item \textbf{Bits 3-2 - EIGHTB[3:2] (8 Bit Transactions):} 
       \begin{itemize}
           \item \texttt{00}: Data is not split into 8-bit transactions.
           \item \texttt{01}: Used for 16-bit configuration to split into 8-bit transactions.
-          \item \texttt{10}: User for 32-bit configuration to split into 8-bit transactions.
+          \item \texttt{10}: Used for 32-bit configuration to split into 8-bit transactions.
           \item \texttt{11}: N/A.
       \end{itemize}
-      \textit{Description:} Used to split 16-bit and 32-bit into 8-bit transactions. Note: Must be 00 for an 8-bit core.
+      \textit{Description:} Used to split 16-bit and 32-bit into 8-bit transactions. Note: Must be 00 for an 8-bit core. 16-bit core can ONLY use 01, 32-bit core can ONLY use 10.
 
       \item \textbf{Bits 1-0 - MODE[1:0] (Mode Selection):} 
       \begin{itemize}
