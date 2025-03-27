@@ -7,57 +7,7 @@ The Spi has been tested in a number of configurations and the following
 results should be representative of what a user should see in their own
 technology.
 
-\renewcommand*{\arraystretch}{1.4}
-\begingroup
-\small
-\begin{longtable}[H]{
-    | p{0.15\textwidth}
-    | p{0.15\textwidth}
-    | p{0.17\textwidth}
-    | p{0.20\textwidth}
-    | p{0.15\textwidth} |
-  }
-  \hline
-  \rowcolor{dark-gray}
-  \textcolor{white}{\textbf{Config Name}}   &
-  \textcolor{white}{\textbf{gpioWidth}}   &
-  \textcolor{white}{\textbf{numVirtualPorts}}     &
-  \textcolor{white}{\textbf{sizeOfVirtualPorts}}     &
-  \textcolor{white}{\textbf{Gates}}           \\ \hline \hline
-  \endfirsthead
-
-  \textcolor{white}{\textbf{Config Name}}   &
-    \textcolor{white}{\textbf{gpioWidth}}   &
-    \textcolor{white}{\textbf{numVirtualPorts}}     &
-    \textcolor{white}{\textbf{sizeOfVirtualPorts}}     &
-    \textcolor{white}{\textbf{Gates}}           \\ \hline \hline
-  \endhead
-
-  \hline
-  \endfoot
-
-  8\_8\_8   &
-  8                      &
-  8                      &
-  8                      &
-  6734                   \\ \hline
-
-  16\_8\_8  &
-  16                     &
-  8                      &
-  8                      &
-  9325                   \\ \hline
-
-  32\_8\_8  &
-  32                     &
-  8                      &
-  8                      &
-  14981                  \\ \hline
-
-\end{longtable}
-\captionsetup{aboveskip=0pt}
-\captionof{table}{Synthesis results}\label{table:area}
-\endgroup
+\input{../../out/doc/synth_sta.tex}
 
 \subsection{SDC File}
 An \texttt{.sdc} file is generated to provide synthesis and static timing
