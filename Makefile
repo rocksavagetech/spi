@@ -60,10 +60,10 @@ clean:
 # 	$(SBT) "publishLocal" | tee doc/publish.rpt
 
 # Generate the documentation
-docs: validate
+docs:
 	@echo Generating docs
-	mkdir -p $(BUILD_ROOT)/doc
-	cd doc/user-guide && pdflatex -output-directory=$(BUILD_ROOT)/doc $(TOP).tex | tee -a $(BUILD_ROOT)/doc/doc.rpt
+	mkdir -p $(PWD)/out/doc
+	cd $(PWD)/doc/user-guide && pdflatex -output-directory=$(PWD)/out/doc $(PWD)/doc/user-guide/SPI.tex | tee -a $(PWD)/out/doc/doc.rpt
 
 # Generate Verilog and synthesize
 # verilog: validate
