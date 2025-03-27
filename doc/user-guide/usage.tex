@@ -1,0 +1,106 @@
+\section{Usage Examples}
+
+\subsection{Full-Duplex Communication}
+The following example demonstrates full-duplex SPI communication in mode 1 (CPOL=0, CPHA=1):
+
+\begin{verbatim}
+// 1. Configure Master and Slave for mode 1
+write(MASTER_CTRLB, 0x01);    // Set SPI mode 1 (CPOL=0, CPHA=1)
+write(SLAVE_CTRLB, 0x01);     // Set same mode on slave
+
+// 2. Prepare data for transmission
+write(MASTER_DATA, 0xA5);     // Master will send 0xA5
+write(SLAVE_DATA, 0x3C);      // Slave will send 0x3C
+
+// 3. Enable Master and Slave
+write(MASTER_CTRLA, 0x21);    // Enable Master, Enable SPI
+write(SLAVE_CTRLA, 0x01);     // Enable Slave
+
+// 4. Wait for transmission to complete
+while (!(read(MASTER_INTFLAGS) & 0x80)); // Wait for RXCIF flag
+
+// 5. Read received data
+uint8_t master_rx = read(MASTER_DATA);  // Should be 0x3C
+uint8_t slave_rx = read(SLAVE_DATA);    // Should be 0xA5
+\end{verbatim}
+
+\subsection{Changing Bit Order}
+The following example demonstrates LSB-first transmission:
+
+\begin{verbatim}
+// 1. Configure Master for LSB-first transmission
+write(MASTER_CTRLB, 0x80);    // Set DORD bit (LSB first)
+
+// 2. Prepare data
+write(MASTER_DATA, 0x81);      // Binary: 10000001
+
+// 3. Enable Master
+write(MASTER_CTRLA, 0x21);     // Enable Master, Enable SPI
+
+// 4. Expected transmission order:
+//    Bit 0 (1) -> Bit 1 (0) -> ... -> Bit 7 (1)
+\end{verbatim}
+
+\subsection{Buffer Mode Operation}
+The following example demonstrates buffered transmission:
+
+\begin{verbatim}
+// 1. Enable buffer mode (must be done before writing data)
+write(MASTER_CTRLB, 0x80);    // Enable buffer mode
+
+// 2. Prepare multiple data bytes
+write(MASTER_DATA, 0x12);     // First byte
+write(MASTER_DATA, 0x34);     // Second byte (buffered)
+write(MASTER_DATA, 0x56);     // Third byte (buffered)
+
+// 3. Enable Master with interrupt
+write(MASTER_INTCTRL, 0x40);  // Enable TX complete interrupt
+write(MASTER_CTRLA, 0x21);    // Enable Master, Enable SPI
+
+// 4. Check buffer status
+while (!(read(MASTER_INTFLAGS) & 0x40)); // Wait for TXCIF flag
+
+// 5. Transmission continues automatically with buffered data
+\end{verbatim}
+
+\subsection{Normal Reception with Interrupts}
+The following example demonstrates reception with interrupt:
+
+\begin{verbatim}
+// 1. Configure reception interrupt
+write(MASTER_INTCTRL, 0x01);  // Enable RX complete interrupt
+
+// 2. Enable Master
+write(MASTER_CTRLA, 0x21);    // Enable Master, Enable SPI
+
+// 3. In interrupt service routine:
+void SPI_ISR() {
+    if (read(MASTER_INTFLAGS) & 0x80) {  // Check RXCIF
+        uint8_t data = read(MASTER_DATA);
+        // Process received data...
+        write(MASTER_INTFLAGS, 0x80);    // Clear flag
+    }
+}
+\end{verbatim}
+
+\subsection{Daisy Chain Configuration}
+The following example demonstrates daisy-chained SPI devices:
+
+\begin{verbatim}
+// 1. Configure all devices (master + 2 slaves)
+write(MASTER_CTRLA, 0x21);    // Enable Master
+write(SLAVE1_CTRLA, 0x01);    // Enable Slave 1
+write(SLAVE2_CTRLA, 0x01);    // Enable Slave 2
+
+// 2. Send data through the chain
+write(MASTER_DATA, 0xAA);     // First byte for slave 1
+write(MASTER_DATA, 0xBB);     // Second byte for slave 2
+
+// 3. Wait for complete transmission
+delay(SPI_TRANSFER_TIME * 3); // Wait for 3 full transfers
+
+// 4. Read received data
+uint8_t slave1_rx = read(SLAVE1_DATA);  // Should be 0xAA
+uint8_t slave2_rx = read(SLAVE2_DATA);  // Should be 0xBB
+uint8_t master_rx = read(MASTER_DATA);  // Returns data from slave 2
+\end{verbatim}
