@@ -2,9 +2,9 @@ name: "Synthesis and Results"
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
   pull_request:
-    branches: ["main"]
+    branches: [ "main" ]
 
 jobs:
   synth-and-publish:
@@ -186,6 +186,7 @@ jobs:
         run: |
           mkdir -p artifacts
           cp -r out/results artifacts/
+          cp -r out/verilog artifacts/
           # Copy netlists from out/synth
           find out/synth -name "*.v" -exec cp {} artifacts/ \;
           # Copy any verilog from generated/ if needed

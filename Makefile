@@ -109,7 +109,7 @@ cov: validate
 
 verilog:
 	@echo Generating Verilog...
-	@$(SBT) "runMain tech.rocksavage.Main verilog --mode print --module tech.rocksavage.chiselware.SPI.SPI --config-class tech.rocksavage.chiselware.SPI.SpiConfig"
+	@$(SBT) "runMain tech.rocksavage.Main verilog --mode write --module tech.rocksavage.chiselware.SPI.SPI --config-class tech.rocksavage.chiselware.SPI.SpiConfig"
 
 synth:
 	@echo Synthesizing...
