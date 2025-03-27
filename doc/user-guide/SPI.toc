@@ -43,3 +43,9 @@
 \contentsline {subsection}{\numberline {7.2}SDC File}{19}{subsection.7.2}%
 \contentsline {subsection}{\numberline {7.3}Timing}{19}{subsection.7.3}%
 \contentsline {subsection}{\numberline {7.4}Multicycle Paths}{19}{subsection.7.4}%
+\contentsline {section}{\numberline {8}Usage Examples}{20}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Full-Duplex Communication}{20}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Changing Bit Order}{20}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Buffer Mode Operation}{20}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Normal Reception with Interrupts}{21}{subsection.8.4}%
+\contentsline {subsection}{\numberline {8.5}Daisy Chain Configuration}{21}{subsection.8.5}%
