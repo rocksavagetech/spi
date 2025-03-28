@@ -67,7 +67,7 @@ docs:
 
 doc_frags:
 	@echo Generating doc fragments
-	@$(SBT) "runMain tech.rocksavage.Main docs --module tech.rocksavage.chiselware.uart.hw.Uart --config-class tech.rocksavage.chiselware.uart.UartConfig --techlib synth/stdcells.lib --clock-period 5.0"
+	@$(SBT) "runMain tech.rocksavage.Main docs --module tech.rocksavage.chiselware.SPI.SPI --techlib synth/stdcells.lib --config-class tech.rocksavage.chiselware.SPI.SpiConfig --clock-period 5.0"
 
 
 
